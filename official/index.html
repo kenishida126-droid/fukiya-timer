@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>スポーツ吹矢タイマー ≪Ver.06 +α♬ Ken.Ishida≫</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<link rel="stylesheet" href="style.css">
+
+</head>
+<body>
+  <div id="overlay"></div>
+
+  <div id="content">
+    <div id="title">
+      <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
+      <h2>≪Ver.06+α♬ Ken.Ishida≫</h2>
+    </div>
+
+    <!-- Round selection (clickable label cycles) -->
+    <div id="roundLabel" role="button" aria-pressed="false">～ 練習ラウンド ～</div>
+
+    <!-- Timer (with overlay "■■■■" that sits over the ":" area) -->
+    <div id="timeContainer">
+      <div id="time" tabindex="0" aria-label="Timer">3:00</div>
+      <div id="timeOverlay" role="button" aria-label="Timer Adjust">■■■■</div>
+    </div>
+
+    <!-- 4-buttons layout -->
+    <div class="controls" id="controls">
+      <div style="width:100%;"><button id="cleanBtn" class="btn clean" aria-pressed="true">筒清掃指示</button></div>
+      <div style="Width:100%;"><button id="startBtn" class="btn start">開　始</button></div>
+      <div style="width:100%;"><button id="bounceBtn" class="btn bounce" aria-pressed="false">撥ね矢</button></div>
+      <div style="width:100%;"><button id="resetBtn" class="btn reset">解　除</button></div>
+    </div>
+
+    <!-- Wallpaper row -->
+    <div class="toggle-row" id="wallRow">
+      <label class="switch wallpaper">
+        <input type="checkbox" id="wallToggle" aria-label="Wallpaper ON/OFF">
+        <span class="slider"></span>
+      </label>
+      <span id="wallToggleLabel">Wallpaper: OFF</span>
+      <span id="wallNum">-0-</span>
+    </div>
+
+    <!-- Metronome row -->
+    <div class="toggle-row" id="metroRow">
+      <label class="switch metronome">
+        <input type="checkbox" id="metroToggle" aria-label="Metronome ON/OFF">
+        <span class="slider"></span>
+      </label>
+      <span id="metroToggleLabel">Metronome: OFF</span>
+    </div>
+
+    <!-- tone radio buttons (sphere) -->
+    <div class="tone-row" id="toneRow" aria-hidden="false">
+      <label title="tone-1"><input type="radio" name="metronomeTone" id="tone-1" value="1"></label>
+      <label title="tone-2"><input type="radio" name="metronomeTone" id="tone-2" value="2"></label>
+      <label title="tone-3"><input type="radio" name="metronomeTone" id="tone-3" value="3"></label>
+      <label title="tone-4"><input type="radio" name="metronomeTone" id="tone-4" value="4"></label>
+      <label title="tone-5"><input type="radio" name="metronomeTone" id="tone-5" value="5"></label>
+      <label title="tone-6"><input type="radio" name="metronomeTone" id="tone-6" value="6"></label>
+    </div>
+
+  </div>
+
+  <!-- audio elements -->
+  <audio id="audio30" src="30sec.mp3" preload="auto"></audio>
+  <audio id="audioEnd" src="end.mp3" preload="auto"></audio>
+  <audio id="audioEndHaneya" src="end_haneya.mp3" preload="auto"></audio>
+  <audio id="audioEndTandoku" src="end_tandoku.mp3" preload="auto"></audio>
+  <audio id="audioClean" src="clean.mp3" preload="auto"></audio>
+  <audio id="start-0" src="start-0.mp3" preload="auto"></audio>
+  <audio id="start-1" src="start-1.mp3" preload="auto"></audio>
+  <audio id="start-2" src="start-2.mp3" preload="auto"></audio>
+  <audio id="start-3" src="start-3.mp3" preload="auto"></audio>
+  <audio id="start-4" src="start-4.mp3" preload="auto"></audio>
+  <audio id="start-5" src="start-5.mp3" preload="auto"></audio>
+  <audio id="start-6" src="start-6.mp3" preload="auto"></audio>
+  <script src="script.js"></script>
+
+</body>
+</html>
