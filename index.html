@@ -3,95 +3,100 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>スポーツ吹矢タイマー メニュー</title>
+<title>スポーツ吹矢タイマー</title>
 <style>
-  html, body {
-    margin: 0;
-    padding: 0;
-    width: 100%;
-    height: 100%;
-    background-color: #000;
-    font-family: Arial, sans-serif;
+  body {
+    margin:0;
+    padding:0;
+    background-color:#000;  /* ブラックバック */
+    font-family: sans-serif;
     color: #fff;
+    text-align:center;
+   /* 文字選択を全面禁止（長押し対策） */
+  -webkit-user-select: none;
+  user-select: none;
   }
 
-  .menu-container {
-    display: flex;
-    flex-direction: column;
-    justify-content: flex-start;
-    align-items: center;
-    padding: 30px; /* タイトル上に1行分の余白確保 */
-    min-height: 100vh;
-    box-sizing: border-box;
-  }
-
-  .menu-title {
-    text-align: center;
+  /* タイトル */
+  h1, h2 {
+    margin:0.2em 0;
     color: gold;
-    font-size: 1.5rem; /* タイトルを少し小さくして1行に */
-    font-weight: bold;
-    line-height: 1.2;
-    margin-bottom: 10px; /* タイトル下の余白調整 */
+    animation: fadeIn 1s ease-out;
   }
 
-  .menu-subtitle {
-    text-align: center;
-    font-weight: normal; /* 太字はやめる */
-    color: gold;
-    font-size: 1.5rem;
-    margin-top: -5px; /* タイトルとの間隔微調整 */
-    margin-bottom: 20px;
+  h1 {
+    font-size: 1.5em;      /* ← フォントを1段階小さく */
+    margin-top: 1em;       /* ← 上部に1行分の余白 */
   }
 
-  .menu-button {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    align-items: center;
-    width: 90%;
-    max-width: 500px;
-    background-color: #222; /* OK出した濃いグレーに戻す */
-    color: #fff;
-    text-decoration: none;
-    padding: 20px;
-    margin: 15px 0;
-    border-radius: 12px;
-    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
-    transition: all 0.2s ease;
+  h2 {
+    font-weight: normal; /* ≪ スポーツ吹矢タイマー ≫ の下文字 */
+    font-size:1.2em;
   }
 
-  .menu-button:hover {
-    background-color: #333; /* 少し明るめの hover */
-    transform: scale(1.03);
+  /* ボタン枠 */
+  .version-box {
+    background-color:#222; /* 濃いグレー */
+    margin: 2em auto;
+    padding: 1em;
+    width: 80%;
+    max-width:400px;
+    border-radius:10px;
+    cursor:pointer;
+    transition: all 0.3s ease;
   }
 
+  /* 中央表示＆文字スライドイン */
   .version-title {
-    font-size: 1.5rem;
-    font-weight: bold;
-    margin-bottom: 8px;
-    text-align: center;
+    font-size:1.4em;
+    font-weight:bold;
+    text-align:center;
+    animation: slideIn 0.5s ease-out;
   }
 
   .version-subtitle {
-    font-size: 1.2rem;
-    text-align: center;
+    font-size:1.2em;
+    text-align:center;
+    margin-top:0.5em;
   }
+
+  /* ホバーで色＆拡大 */
+  .version-box:hover {
+    background-color:#444;
+    transform: scale(1.05);
+  }
+
+  /* アニメーション */
+  @keyframes fadeIn {
+    0% {opacity:0;}
+    100% {opacity:1;}
+  }
+
+  @keyframes slideIn {
+    0% {transform: translateY(20px); opacity:0;}
+    100% {transform: translateY(0); opacity:1;}
+  }
+
 </style>
 </head>
 <body>
-<div class="menu-container">
-  <div class="menu-title">≪ スポーツ吹矢タイマー ≫</div>
-  <div class="menu-subtitle">～ by Ken.Ishida ～</div>
 
-  <a href="official/index.html" class="menu-button">
-    <div class="version-title">Ⅰ．Official version</div>
-    <div class="version-subtitle">《吹矢タイマー_Ver.06+α♬》</div>
-  </a>
+<h1>≪ スポーツ吹矢タイマー ≫</h1>
+<h2>～ by Ken.Ishida ～</h2>
 
-  <a href="extra/index.html" class="menu-button">
-    <div class="version-title">Ⅱ．Extra version</div>
-    <div class="version-subtitle">《吹矢タイマー_Extra_Ver.01》</div>
-  </a>
+<div class="version-box" onclick="location.href='official/index.html'">
+  <div class="version-title">
+  Ⅰ．Official version <span style="font-size:0.7em; color:#aaa;">(標準機能)</span>
+  </div>
+  <div class="version-subtitle">《吹矢タイマー_Ver.06+α♬》</div>
 </div>
+
+<div class="version-box" onclick="location.href='extra/index.html'">
+  <div class="version-title">
+  Ⅱ．Extra version <span style="font-size:0.7em; color:#aaa;">(自主練用)</span>
+  </div>
+  <div class="version-subtitle">《吹矢タイマー_Extra_Ver.01》</div>
+</div>
+
 </body>
 </html>
