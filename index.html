@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>スポーツ吹矢タイマー メニュー</title>
+<style>
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    height: 100%;
+    background-color: #000;
+    font-family: Arial, sans-serif;
+    color: #fff;
+  }
+
+  .menu-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: flex-start;
+    align-items: center;
+    padding: 30px; /* タイトル上に1行分の余白確保 */
+    min-height: 100vh;
+    box-sizing: border-box;
+  }
+
+  .menu-title {
+    text-align: center;
+    color: gold;
+    font-size: 1.5rem; /* タイトルを少し小さくして1行に */
+    font-weight: bold;
+    line-height: 1.2;
+    margin-bottom: 10px; /* タイトル下の余白調整 */
+  }
+
+  .menu-subtitle {
+    text-align: center;
+    font-weight: normal; /* 太字はやめる */
+    color: gold;
+    font-size: 1.5rem;
+    margin-top: -5px; /* タイトルとの間隔微調整 */
+    margin-bottom: 20px;
+  }
+
+  .menu-button {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    width: 90%;
+    max-width: 500px;
+    background-color: #222; /* OK出した濃いグレーに戻す */
+    color: #fff;
+    text-decoration: none;
+    padding: 20px;
+    margin: 15px 0;
+    border-radius: 12px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+    transition: all 0.2s ease;
+  }
+
+  .menu-button:hover {
+    background-color: #333; /* 少し明るめの hover */
+    transform: scale(1.03);
+  }
+
+  .version-title {
+    font-size: 1.5rem;
+    font-weight: bold;
+    margin-bottom: 8px;
+    text-align: center;
+  }
+
+  .version-subtitle {
+    font-size: 1.2rem;
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="menu-container">
+  <div class="menu-title">≪ スポーツ吹矢タイマー ≫</div>
+  <div class="menu-subtitle">～ by Ken.Ishida ～</div>
+
+  <a href="official/index.html" class="menu-button">
+    <div class="version-title">Ⅰ．Official version</div>
+    <div class="version-subtitle">《吹矢タイマー_Ver.06+α♬》</div>
+  </a>
+
+  <a href="extra/index.html" class="menu-button">
+    <div class="version-title">Ⅱ．Extra version</div>
+    <div class="version-subtitle">《吹矢タイマー_Extra_Ver.01》</div>
+  </a>
+</div>
+</body>
+</html>
