@@ -13,7 +13,6 @@ html, body {
   color: #fff;
   font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
   text-align: center;
-  /* 文字選択を全面禁止（長押し対策） */
   -webkit-user-select: none;
   user-select: none;
 }
@@ -58,7 +57,7 @@ html, body {
   width: 100%;
 }
 
-/* ===== 矢（完成形） ===== */
+/* ===== 矢 ===== */
 .arrow {
   position: relative;
   margin: auto;
@@ -138,7 +137,6 @@ let prevIndex = -1;
 
 /* ===== WakeLock ===== */
 let wakeLock = null;
-
 async function requestWakeLock() {
   try {
     if ('wakeLock' in navigator) {
@@ -146,14 +144,12 @@ async function requestWakeLock() {
     }
   } catch {}
 }
-
 function releaseWakeLock() {
   if (wakeLock) {
     wakeLock.release().catch(()=>{});
     wakeLock = null;
   }
 }
-
 document.addEventListener("visibilitychange", () => {
   if (document.visibilityState === "visible" && running) {
     requestWakeLock();
@@ -166,25 +162,32 @@ const label = document.getElementById("label");
 
 const ranges = [[180,142],[141,108],[107,74],[73,40],[39,0]];
 
-/* ===== Audio : BEEP分離 ===== */
-const ctx = new (window.AudioContext || window.webkitAudioContext)();
-
-function beepArrow() {          // 矢切替用（大）
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.connect(g); g.connect(ctx.destination);
-  o.frequency.value = 2000;
-  g.gain.value = 0.6;
-  o.start(); o.stop(ctx.currentTime + 0.08);
+/* ===== Audio（遅延生成）===== */
+let ctx = null;
+function getAudioCtx() {
+  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (ctx.state === "suspended") ctx.resume();
+  return ctx;
 }
 
-function beepTap() {            // タップ用（小）
-  const o = ctx.createOscillator();
-  const g = ctx.createGain();
-  o.connect(g); g.connect(ctx.destination);
+function beepArrow() {
+  const c = getAudioCtx();
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.connect(g); g.connect(c.destination);
+  o.frequency.value = 2000;
+  g.gain.value = 0.6;
+  o.start(); o.stop(c.currentTime + 0.08);
+}
+
+function beepTap() {
+  const c = getAudioCtx();
+  const o = c.createOscillator();
+  const g = c.createGain();
+  o.connect(g); g.connect(c.destination);
   o.frequency.value = 1800;
   g.gain.value = 0.15;
-  o.start(); o.stop(ctx.currentTime + 0.05);
+  o.start(); o.stop(c.currentTime + 0.05);
 }
 
 const audioStart = new Audio("start-0.mp3");
@@ -247,13 +250,10 @@ timer.onclick = async () => {
   if (!running && time === TOTAL) {
     running = true;
     await requestWakeLock();
-
     intervalId = setInterval(() => {
-
       if (time === 182) audioStart.play();
       if (time === 31) audio30.play();
       if (time === 1) audioEnd.play();
-
       if (time <= 0) {
         clearInterval(intervalId);
         running = false;
@@ -262,11 +262,9 @@ timer.onclick = async () => {
         updateTimer();
         return;
       }
-
       time--;
       updateTimer();
       if (shotPace && time <= READY) updateArrows();
-
     }, 1000);
   } else {
     resetAll();
