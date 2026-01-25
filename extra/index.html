@@ -122,9 +122,11 @@ html, body {
 </div>
 
 <script>
+/* ===== 定数 ===== */
 const TOTAL = 185;
 const READY = 180;
 
+/* ===== 状態 ===== */
 let time = TOTAL;
 let running = false;
 let intervalId = null;
@@ -147,7 +149,7 @@ function releaseWakeLock() {
   }
 }
 
-/* ===== WebAudio ===== */
+/* ===== WebAudio（UI音） ===== */
 let ctx = null;
 function audioCtx() {
   if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
@@ -175,27 +177,14 @@ function beepArrow() {
   o.start(); o.stop(c.currentTime + 0.08);
 }
 
-/* ===== 音声 ===== */
-const audioStart = new Audio("start-0.mp3");
-const audio30   = new Audio("30sec.mp3");
-const audioEnd  = new Audio("end.mp3");
-
-let audioUnlocked = false;
-function unlockAudioOnce() {
-  if (audioUnlocked) return;
-  audioUnlocked = true;
-  [audioStart,audio30,audioEnd].forEach(a=>{
-    a.volume=0;
-    a.play().then(()=>{ a.pause(); a.currentTime=0; a.volume=1; }).catch(()=>{});
-  });
-}
-
+/* ===== DOM ===== */
 const timer = document.getElementById("timer");
 const arrows = [...document.querySelectorAll(".arrow")];
 const label = document.getElementById("label");
 
 const ranges = [[180,142],[141,108],[107,74],[73,40],[39,0]];
 
+/* ===== 表示更新 ===== */
 function updateTimer() {
   const m = Math.floor(time/60);
   const s = time%60;
@@ -208,12 +197,18 @@ function updateTimer() {
 }
 
 function arrowsOff() {
-  arrows.forEach(a=>{ a.classList.remove("blink"); a.style.visibility="hidden"; });
+  arrows.forEach(a=>{
+    a.classList.remove("blink");
+    a.style.visibility="hidden";
+  });
   label.style.display="flex";
 }
 
 function arrowsOn() {
-  arrows.forEach(a=>{ a.classList.remove("blink"); a.style.visibility="visible"; });
+  arrows.forEach(a=>{
+    a.classList.remove("blink");
+    a.style.visibility="visible";
+  });
   label.style.display="none";
 }
 
@@ -225,7 +220,7 @@ function updateArrows() {
   });
   if (idx>=0 && time>0) {
     arrows[idx].classList.add("blink");
-    if (prevIndex >= 0 && idx !== prevIndex) beepArrow(); // ★完全復元
+    if (prevIndex >= 0 && idx !== prevIndex) beepArrow();
   }
   prevIndex = idx;
 }
@@ -241,16 +236,19 @@ function resetAll() {
   shotPace?arrowsOn():arrowsOff();
 }
 
+/* ===== メイン操作 ===== */
 timer.onclick = async ()=>{
-  unlockAudioOnce();
   beepTap();
+
   if (!running && time===TOTAL) {
     running=true;
     await requestWakeLock();
+
     intervalId=setInterval(()=>{
-      if (time===182) audioStart.play();
-      if (time===31) audio30.play();
-      if (time===1) audioEnd.play();
+      if (time === 182) new Audio("start-0.mp3").play();
+      if (time === 31)  new Audio("30sec.mp3").play();
+      if (time === 1)   new Audio("end.mp3").play();
+
       if (time<=0) {
         clearInterval(intervalId);
         running=false;
@@ -258,10 +256,12 @@ timer.onclick = async ()=>{
         updateTimer();
         return;
       }
+
       time--;
       updateTimer();
       if (shotPace && time<=READY) updateArrows();
     },1000);
+
   } else {
     resetAll();
   }
