@@ -248,9 +248,9 @@ timer.onclick = async ()=>{
     running=true;
     await requestWakeLock();
     intervalId=setInterval(()=>{
-      if (time === 182) new Audio("start-0.mp3").play();
-      if (time === 31)  new Audio("30sec.mp3").play();
-      if (time === 1)   new Audio("end.mp3").play();
+      if (time===182) audioStart.play();
+      if (time===31) audio30.play();
+      if (time===1) audioEnd.play();
       if (time<=0) {
         clearInterval(intervalId);
         running=false;
