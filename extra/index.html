@@ -31,7 +31,6 @@ html, body {
   line-height: 1;
   transform: scaleY(1.3);
   cursor: pointer;
-  text-align: center;
 }
 
 .timer-lime { color:#00ff00; }
@@ -50,7 +49,6 @@ html, body {
 #arrows {
   display: grid;
   grid-template-columns: repeat(5, 1fr);
-  width: 100%;
 }
 
 /* ===== 矢 ===== */
@@ -157,24 +155,36 @@ function audioCtx() {
   return ctx;
 }
 
-function beepTap() {
+function beep(freq, dur, gain) {
   const c = audioCtx();
   const o = c.createOscillator();
   const g = c.createGain();
   o.connect(g); g.connect(c.destination);
-  o.frequency.value = 1800;
-  g.gain.value = 0.15;
-  o.start(); o.stop(c.currentTime + 0.05);
+  o.frequency.value = freq;
+  g.gain.value = gain;
+  o.start();
+  o.stop(c.currentTime + dur);
 }
 
-function beepArrow() {
-  const c = audioCtx();
-  const o = c.createOscillator();
-  const g = c.createGain();
-  o.connect(g); g.connect(c.destination);
-  o.frequency.value = 2000;
-  g.gain.value = 0.5;
-  o.start(); o.stop(c.currentTime + 0.08);
+const beepTap   = ()=>beep(1800,0.05,0.15);
+const beepArrow = ()=>beep(2000,0.08,0.5);
+
+/* ===== iOS Audio Unlock ===== */
+let audioUnlocked = false;
+let sndStart, snd30, sndEnd;
+
+function unlockAudio() {
+  if (audioUnlocked) return;
+  audioCtx();
+  sndStart = new Audio("start-0.mp3");
+  snd30    = new Audio("30sec.mp3");
+  sndEnd   = new Audio("end.mp3");
+  [sndStart, snd30, sndEnd].forEach(a=>{
+    a.volume = 0;
+    a.play().then(()=>{ a.pause(); a.currentTime=0; });
+    a.volume = 1;
+  });
+  audioUnlocked = true;
 }
 
 /* ===== DOM ===== */
@@ -220,7 +230,7 @@ function updateArrows() {
   });
   if (idx>=0 && time>0) {
     arrows[idx].classList.add("blink");
-    if (prevIndex >= 0 && idx !== prevIndex) beepArrow();
+    if (prevIndex>=0 && idx!==prevIndex) beepArrow();
   }
   prevIndex = idx;
 }
@@ -238,6 +248,7 @@ function resetAll() {
 
 /* ===== メイン操作 ===== */
 timer.onclick = async ()=>{
+  unlockAudio();
   beepTap();
 
   if (!running && time===TOTAL) {
@@ -245,9 +256,9 @@ timer.onclick = async ()=>{
     await requestWakeLock();
 
     intervalId=setInterval(()=>{
-      if (time === 182) new Audio("start-0.mp3").play();
-      if (time === 31)  new Audio("30sec.mp3").play();
-      if (time === 1)   new Audio("end.mp3").play();
+      if (time===182) sndStart.play();
+      if (time===31)  snd30.play();
+      if (time===1)   sndEnd.play();
 
       if (time<=0) {
         clearInterval(intervalId);
@@ -269,6 +280,7 @@ timer.onclick = async ()=>{
 
 shotpace.onclick = ()=>{
   if (running) return;
+  unlockAudio();
   beepTap();
   shotPace=!shotPace;
   shotPace?arrowsOn():arrowsOff();
