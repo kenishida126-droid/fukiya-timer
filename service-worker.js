@@ -1,3 +1,11 @@
-self.addEventListener("fetch", function (event) {
-  // 何もしない最小SW
+self.addEventListener('install', event => {
+  self.skipWaiting();
+});
+
+self.addEventListener('activate', event => {
+  self.clients.claim();
+});
+
+self.addEventListener('fetch', event => {
+  event.respondWith(fetch(event.request));
 });
