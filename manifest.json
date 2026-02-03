@@ -2,6 +2,7 @@
   "name": "スポーツ吹矢タイマー MENU",
   "short_name": "吹矢MENU",
   "start_url": "./index.html",
+  "scope": "./",
   "display": "standalone",
   "background_color": "#000000",
   "theme_color": "#000000",
