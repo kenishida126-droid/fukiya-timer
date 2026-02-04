@@ -97,6 +97,10 @@ html, body {
   color: #00ff00;
   pointer-events: none;
 }
+/* Extra：Android Chrome用 アドレスバー退避余白 */
+.extra-bottom-spacer {
+  height: 120px;   /* 60～150pxで微調整 */
+}
 </style>
 </head>
 
@@ -147,27 +151,50 @@ function releaseWakeLock() {
   }
 }
 
-/* ===== WebAudio（UI音） ===== */
-let ctx = null;
-function audioCtx() {
-  if (!ctx) ctx = new (window.AudioContext || window.webkitAudioContext)();
-  if (ctx.state === "suspended") ctx.resume();
-  return ctx;
+/* ===== WebAudio 共通 ===== */
+const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+const audioCtx = new AudioContextClass();
+
+function playTone(freq, startTime, duration) {
+  const osc = audioCtx.createOscillator();
+  const gain = audioCtx.createGain();
+
+  osc.type = 'sine';
+  osc.frequency.setValueAtTime(freq, startTime);
+
+  gain.gain.setValueAtTime(0.5, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start(startTime);
+  osc.stop(startTime + duration);
 }
 
+/* ===== UI音 ===== */
 function beep(freq, dur, gain) {
-  const c = audioCtx();
-  const o = c.createOscillator();
-  const g = c.createGain();
-  o.connect(g); g.connect(c.destination);
+  const o = audioCtx.createOscillator();
+  const g = audioCtx.createGain();
+  o.connect(g); g.connect(audioCtx.destination);
   o.frequency.value = freq;
   g.gain.value = gain;
   o.start();
-  o.stop(c.currentTime + dur);
+  o.stop(audioCtx.currentTime + dur);
 }
 
-const beepTap   = ()=>beep(1800,0.05,0.15);
-const beepArrow = ()=>beep(2000,0.08,0.5);
+const beepTap = ()=>beep(1800,0.05,0.15);
+
+/* ===== ★ beepArrow：ドアチャイム音（謙さん版） ===== */
+function beepArrow() {
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+
+  const now = audioCtx.currentTime;
+
+  // 「ピン」
+  playTone(1210, now, 0.5);
+
+  // 「ポーン」
+  playTone(965, now + 0.5, 0.8);
+}
 
 /* ===== iOS Audio Unlock ===== */
 let audioUnlocked = false;
@@ -175,7 +202,6 @@ let sndStart, snd30, sndEnd;
 
 function unlockAudio() {
   if (audioUnlocked) return;
-  audioCtx();
   sndStart = new Audio("start-0.mp3");
   snd30    = new Audio("30sec.mp3");
   sndEnd   = new Audio("end.mp3");
@@ -235,17 +261,6 @@ function updateArrows() {
   prevIndex = idx;
 }
 
-function resetAll() {
-  clearInterval(intervalId);
-  intervalId=null;
-  running=false;
-  releaseWakeLock();
-  time=TOTAL;
-  prevIndex=-1;
-  updateTimer();
-  shotPace?arrowsOn():arrowsOff();
-}
-
 /* ===== メイン操作 ===== */
 timer.onclick = async ()=>{
   unlockAudio();
@@ -274,7 +289,13 @@ timer.onclick = async ()=>{
     },1000);
 
   } else {
-    resetAll();
+    clearInterval(intervalId);
+    running=false;
+    releaseWakeLock();
+    time=TOTAL;
+    prevIndex=-1;
+    updateTimer();
+    shotPace?arrowsOn():arrowsOff();
   }
 };
 
@@ -290,5 +311,6 @@ updateTimer();
 arrowsOff();
 </script>
 
+<div class="extra-bottom-spacer"></div>
 </body>
 </html>
