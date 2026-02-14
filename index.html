@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>スポーツ吹矢タイマー</title>
+<link rel="manifest" href="manifest.json">
 <style>
   body {
     margin:0;
@@ -88,7 +89,7 @@
   <div class="version-title">
   Ⅰ．Official version <span style="font-size:0.7em; color:#aaa;">(標準)</span>
   </div>
-  <div class="version-subtitle">《吹矢タイマー Ver.06+α♬》</div>
+  <div class="version-subtitle">《吹矢タイマー Ver.07》</div>
 </div>
 
 <div class="version-box" onclick="location.href='extra/index.html'">
@@ -109,8 +110,24 @@
   <div class="version-title">
   Ⅳ．Gemini version <span style="font-size:0.7em; color:#aaa;">(音声認識)</span>
   </div>
-  <div class="version-subtitle">《「スタート/開始/始め」を認識》</div>
+  <div class="version-subtitle">「スタート/開始/始め」を認識</div>
 </div>
+
+<script>
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js');
+
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data && event.data.type === 'CACHE_UPDATED') {
+      alert(
+        '吹矢Timer_PWA が更新されました。\n' +
+        '通信が発生しますので、Wi-Fi 環境下で\n' +
+        'しばらく起動したままにしてください。'
+      );
+    }
+  });
+}
+</script>
 
 </body>
 </html>
