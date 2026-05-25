@@ -118,6 +118,7 @@
 </div>
 
 <script>
+// manual.pdf => GitHub 日付を"※ 取説はこちら：yy/mm/dd UP版"と表記
 fetch("manual.pdf", { method: "HEAD" })
   .then(response => {
     const lastModified = response.headers.get("Last-Modified");
