@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>test</title>
+
+<!-- ★PDF.js本体 -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
+
+</head>
+<body>
+
+<div id="result">loading...</div>
+
+<script>
+console.log("pdfjsLib:", typeof pdfjsLib);
+
+document.getElementById("result").innerText =
+  "pdfjsLib = " + typeof pdfjsLib;
+</script>
+
+</body>
+</html>
