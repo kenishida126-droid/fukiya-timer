@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>PDF.js manual test</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
+
+<style>
+  body{
+    background:#000;
+    color:#fff;
+    font-family:sans-serif;
+    text-align:center;
+    padding-top:30px;
+  }
+  #result{
+    margin-top:20px;
+    white-space:pre-wrap;
+    font-size:14px;
+  }
+</style>
+</head>
+
+<body>
+
+<h2>PDF.js manual.pdf test</h2>
+
+<div id="result">loading...</div>
+
+<script>
+/* ===== PDF.js worker設定 ===== */
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.worker.min.js";
+
+/* ===== メイン処理 ===== */
+async function run() {
+  try {
+    const pdf = await pdfjsLib.getDocument("manual.pdf").promise;
+
+    const page = await pdf.getPage(1);
+    const content = await page.getTextContent();
+
+    const text = content.items.map(i => i.str).join(" ");
+
+    console.log("===== PDF TEXT START =====");
+    console.log(text);
+    console.log("===== PDF TEXT END =====");
+
+    // 日付抽出
+    const match = text.match(/(\d{4})年(\d{2})月(\d{2})日版/);
+
+    if (!match) {
+      document.getElementById("result").innerText =
+        "日付が見つかりませんでした\n\nPDFテキスト:\n" + text.slice(0, 300);
+      return;
+    }
+
+    const yy = match[1].slice(-2);
+    const mm = match[2];
+    const dd = match[3];
+
+    document.getElementById("result").innerText =
+      `※ 取説はこちら：${yy}/${mm}/${dd} UP版\n\n` +
+      "抽出成功";
+
+  } catch (e) {
+    console.error(e);
+    document.getElementById("result").innerText =
+      "PDF読み込み失敗\n\n" + e;
+  }
+}
+
+run();
+</script>
+
+</body>
+</html>
