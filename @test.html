@@ -2,21 +2,44 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>test</title>
-
-<!-- ★PDF.js本体 -->
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.6.82/pdf.min.js"></script>
-
+<title>manual date test</title>
 </head>
-<body>
+<body style="background:#000;color:#fff;text-align:center;padding-top:30px;">
 
 <div id="result">loading...</div>
 
 <script>
-console.log("pdfjsLib:", typeof pdfjsLib);
+async function run() {
+  try {
 
-document.getElementById("result").innerText =
-  "pdfjsLib = " + typeof pdfjsLib;
+    const res = await fetch("manual.pdf");
+    const buf = await res.arrayBuffer();
+
+    const text = new TextDecoder("utf-8").decode(buf);
+
+    // 日付パターン抽出
+    const match = text.match(/(\d{4})年(\d{2})月(\d{2})日版/);
+
+    if (!match) {
+      document.getElementById("result").innerText =
+        "日付が見つかりません\n\n(※PDF構造の問題)";
+      return;
+    }
+
+    const yy = match[1].slice(-2);
+    const mm = match[2];
+    const dd = match[3];
+
+    document.getElementById("result").innerText =
+      `※ 取説はこちら：${yy}/${mm}/${dd} UP版`;
+
+  } catch (e) {
+    document.getElementById("result").innerText =
+      "失敗：" + e;
+  }
+}
+
+run();
 </script>
 
 </body>
