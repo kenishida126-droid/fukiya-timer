@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>スポーツ吹矢タイマー ≪Ver.10.4 Ken.Ishida≫</title>
+<title>スポーツ吹矢タイマー ≪Ver.10.4a Ken.Ishida≫</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
 :root{
@@ -312,7 +312,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪Ver.10.4 Ken.Ishida≫</h2>
+      <h2>≪Ver.10.4a Ken.Ishida≫</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -383,8 +383,9 @@ body {
   <audio id="audioEndHaneya" src="end_haneya.mp3" preload="auto"></audio>
   <audio id="audioEndTandoku" src="end_tandoku.mp3" preload="auto"></audio>
   <audio id="audioClean" src="clean.mp3" preload="auto"></audio>
+<!--
   <audio id="audioEndEarly" src="end_early.mp3" preload="auto"></audio>
-
+-->
 
 <script>
 /* ===== 状態変数 ===== */
@@ -467,7 +468,14 @@ const timeOverlay = document.getElementById('timeOverlay');
 let iosAudioUnlocked = false;
 function unlockIosAudio(){
   if(iosAudioUnlocked) return;
-  const list = [audio30,audioEnd,audioEndHaneya,audioEndTandoku,audioClean,audioEndEarly];
+  const list = [
+    audio30,
+    audioEnd,
+    audioEndHaneya,
+    audioEndTandoku,
+    audioClean
+    // ,audioEndEarly
+    ];
   list.forEach(a=>{
     if(!a) return;
     try{
@@ -1534,8 +1542,8 @@ mainTitle.addEventListener('click', async (ev)=>{
 /* ===== 追加：早期終了用Audio ===== */
 // HTMLに以下を追加すること
 // <audio id="audioEndEarly" src="end_early.mp3" preload="auto"></audio>
-const audioEndEarly = document.getElementById('audioEndEarly');
-
+// const audioEndEarly = document.getElementById('audioEndEarly');
+// ↑2026.06.15.commentout
 /* ★重要：iOS用アンロック対象に追加すること
    既存の unlockIosAudio() 内の list に audioEndEarly を追加してください
    例：
@@ -1558,19 +1566,29 @@ function handleEarlyEnd(){
     currentAudioStart = null;
   }
 
-  if(audioEndEarly){
-    audioEndEarly.currentTime = 0;
-    const p = audioEndEarly.play();
-    if(p && p.catch){ p.catch(()=>{}); }
-
-  // ★ここも必ず同じ変数にする
-    audioEndEarly.addEventListener('ended', ()=>{
+/*
+if(audioEndEarly){
+  audioEndEarly.currentTime = 0;
+  const p = audioEndEarly.play();
+  if(p && p.catch){ p.catch(()=>{}); }
+  audioEndEarly.addEventListener('ended', ()=>{
       speakRemaining(remainSec);
   }, { once:true });
+} else {
+  console.warn('audioEndEarly が見つかりません');
+}
+*/
 
-  } else {
-    console.warn('audioEndEarly が見つかりません');
-  }
+if(audioEndTandoku){
+  audioEndTandoku.currentTime = 0;
+  const p = audioEndTandoku.play();
+  if(p && p.catch){ p.catch(()=>{}); }
+  audioEndTandoku.addEventListener('ended', ()=>{
+      speakRemaining(remainSec);
+  }, { once:true });
+} else {
+  console.warn('audioEndTandoku が見つかりません');
+}
 
   started = false;
 
@@ -1599,7 +1617,9 @@ function speakRemaining(sec){
   try{
     if(!('speechSynthesis' in window)) return;
 
-    const msg = new SpeechSynthesisUtterance(`${sec}秒、残ってました。`);
+    const msg = new SpeechSynthesisUtterance(
+    `少し早すぎます、${sec}秒、残ってました。`
+    );
     msg.lang = 'ja-JP';
     msg.rate = 1.0;
     msg.pitch = 1.0;
