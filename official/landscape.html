@@ -622,6 +622,7 @@ let currentAudioStart = null;
 let audioStartTimeout = null;
 let iosAudioUnlocked = false;
 let wakeLock = null;
+let startTimerTimeout = null;   // ←追加
 
 async function enableWakeLock(){
     try{
@@ -682,6 +683,21 @@ function doPulse(){
     timeDiv.classList.remove("pulse");
     void timeDiv.offsetWidth;
     timeDiv.classList.add("pulse");
+}
+
+function warmupSpeech(){
+    try{
+        if(!("speechSynthesis" in window)){
+            return;
+        }
+        const msg =
+            new SpeechSynthesisUtterance(
+                "あ"
+            );
+        msg.volume = 0;
+        msg.lang = "ja-JP";
+        speechSynthesis.speak(msg);
+    }catch(e){}
 }
 
 /* ===== 開始ビープ音 ===== */
@@ -884,18 +900,13 @@ function updateResetButton(){
 function startTimer(){
     if(started) return;
     enableWakeLock();
-
     started = true;
-    unlockIosAudio();
-    start_beep();
-
     pulseFired = {
         p305:false,
         p300:false,
         p030:false,
         p010:false
     };
-
     startBtn.classList.add("locked");
     remaining = 185;   // 3:05
     updateDisplay();
@@ -1020,6 +1031,12 @@ function speakRemaining(sec){
 }
 
 function handleEarlyEnd(){
+    if(startTimerTimeout){
+        clearTimeout(
+            startTimerTimeout
+        );
+        startTimerTimeout = null;
+    }
     if(!started) return;
     const remainSec = remaining;
     if(timer){ clearInterval(timer); timer = null; }
@@ -1063,6 +1080,12 @@ function handleEarlyEnd(){
 
 /* 解除 */
 function resetTimer(){
+    if(startTimerTimeout){
+        clearTimeout(
+            startTimerTimeout
+        );
+        startTimerTimeout = null;
+    }
     if(audioStartTimeout){
         clearTimeout(
             audioStartTimeout
@@ -1082,7 +1105,9 @@ function resetTimer(){
     }
     started = false;
     disableWakeLock();
-    startBtn.classList.remove("locked");
+    startBtn.classList.remove(
+        "locked"
+    );
     updateStartButtonReady();
     remaining = 180;
     bounceOn = false;
@@ -1113,12 +1138,22 @@ startBtn.addEventListener(
         ){
             return;
         }
+        warmupSpeech();
         unlockIosAudio();
-        setTimeout(()=>{
-            if(!timer){
-                startTimer();
-            }
-        },100);
+        start_beep();
+        if(startTimerTimeout){
+            clearTimeout(
+                startTimerTimeout
+            );
+        }
+        startTimerTimeout =
+            setTimeout(()=>{
+                startTimerTimeout =
+                    null;
+                if(!timer){
+                    startTimer();
+                }
+            },100);
     }
 );
 
