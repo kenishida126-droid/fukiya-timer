@@ -379,7 +379,6 @@ body {
   </div>
 
   <!-- start-x preload -->
-  <!--
   <audio id="audioStart0" src="start-0.mp3" preload="auto"></audio>
   <audio id="audioStart1" src="start-1.mp3" preload="auto"></audio>
   <audio id="audioStart2" src="start-2.mp3" preload="auto"></audio>
@@ -387,7 +386,6 @@ body {
   <audio id="audioStart4" src="start-4.mp3" preload="auto"></audio>
   <audio id="audioStart5" src="start-5.mp3" preload="auto"></audio>
   <audio id="audioStart6" src="start-6.mp3" preload="auto"></audio>
-  -->
 
   <!-- audio elements -->
   <audio id="audio30" src="30sec.mp3" preload="auto"></audio>
@@ -471,21 +469,56 @@ const audioEndHaneya = document.getElementById('audioEndHaneya');
 const audioEndTandoku = document.getElementById('audioEndTandoku');
 const audioClean = document.getElementById('audioClean');
 
+const startAudios = [
+  document.getElementById('audioStart0'),
+  document.getElementById('audioStart1'),
+  document.getElementById('audioStart2'),
+  document.getElementById('audioStart3'),
+  document.getElementById('audioStart4'),
+  document.getElementById('audioStart5'),
+  document.getElementById('audioStart6')
+];
+
 function updateStartButtonReady(){
-    startBtn.classList.remove(
-        "audioNotReady"
-    );
-    if(!started){
+    const audioStart =
+        startAudios[roundIndex];
+    if(audioStart.readyState >= 4){
         startBtn.classList.remove(
+            "audioNotReady"
+        );
+        if(!started){
+            startBtn.classList.remove(
+                "pressed"
+            );
+        }
+    }else{
+        startBtn.classList.add(
+            "audioNotReady"
+        );
+        startBtn.classList.add(
             "pressed"
+        );
+        audioStart.addEventListener(
+            "canplaythrough",
+            ()=>{
+                startBtn.classList.remove(
+                    "audioNotReady"
+                );
+                if(!started){
+                    startBtn.classList.remove(
+                        "pressed"
+                    );
+                }
+            },
+            { once:true }
         );
     }
 }
 
 window.addEventListener('load', ()=>{
-    startAudios.forEach(audio=>{
-        audio.load();
-    });
+    // startAudios.forEach(audio=>{
+    //     audio.load();
+    // });
     updateStartButtonReady();
 });
 
@@ -655,11 +688,10 @@ function startTimer(){
   startBtn.classList.add('locked');
 
   // start audio that should finish exactly when remaining reaches 180
-  const audioStart =
-      new Audio(
-          `start-${roundIndex}.mp3`
-      );
+  const audioStart = startAudios[roundIndex];
   currentAudioStart = audioStart;
+  audioStart.currentTime = 0;
+
   const scheduleStartAudio = ()=>{
       const dur = audioStart.duration || 0;
       const playAt = 180 + dur;
@@ -668,10 +700,12 @@ function startTimer(){
           0,
           Math.round(delaySeconds * 1000)
       );
+
       if(audioStartTimeout){
           clearTimeout(audioStartTimeout);
           audioStartTimeout = null;
       }
+
       if(delayMs === 0){
           audioStart.play().catch(()=>{});
       }else{
