@@ -306,9 +306,49 @@ body {
   animation: roundPulse 0.8s cubic-bezier(.2,1.7,.4,1) 1;
 }
 
+/* 起動時オーバレイ */
+#startupOverlay{
+  position:fixed;
+  inset:0;
+
+  background:rgba(0,0,0,0.65);
+
+  display:flex;
+  justify-content:center;
+  align-items:center;
+
+  z-index:999999;
+}
+
+/* 鍵アイコン */
+#startupBtn{
+
+  font-size:120px;
+
+  user-select:none;
+
+  cursor:pointer;
+
+  transition:
+      transform 1.2s ease,
+      opacity 1.2s ease;
+}
+
+/* TAP時 */
+#startupBtn.unlock{
+
+  transform:scale(2.5);
+
+  opacity:0;
+}
+
 </style>
 </head>
 <body>
+  <div id="startupOverlay">
+  <div id="startupBtn">🔒</div>
+  </div>
+
   <div id="overlay"></div>
 
   <div id="content">
@@ -516,13 +556,22 @@ function updateStartButtonReady(){
 }
 
 window.addEventListener('load', ()=>{
-    // startAudios.forEach(audio=>{
-    //     audio.load();
-    // });
+    startAudios.forEach(audio=>{
+        audio.load();
+    });
     updateStartButtonReady();
 });
 
 const timeOverlay = document.getElementById('timeOverlay');
+const startupOverlay =
+    document.getElementById(
+        'startupOverlay'
+    );
+
+const startupBtn =
+    document.getElementById(
+        'startupBtn'
+    );
 
 /* === iOS audio unlock (必須) ===
    iOS Safari は「最初のユーザー操作」で
@@ -551,7 +600,25 @@ function unlockIosAudio(){
     }catch(e){}
   });
   iosAudioUnlocked = true;
-} /* overlay element */
+}
+
+startupBtn.addEventListener(
+  'click',
+  ()=>{
+    warmupSpeech();
+    unlockIosAudio();
+    startupBtn.textContent = '🔓';
+    startupBtn.classList.add(
+      'unlock'
+    );
+    setTimeout(()=>{
+      startupOverlay.style.display =
+        'none';
+    },1200);
+  }
+);
+
+/* overlay element */
 const mainTitle = document.getElementById('mainTitle'); /* タイトル要素 */
 
 /* helper: format time */
@@ -1163,11 +1230,11 @@ if(
     return;
 }
 
-  warmupSpeech();
+//  warmupSpeech();
   if(startBtn.classList.contains('locked')) return; // ←追加
 
   // iOS 対策: ユーザー操作中に audio をアンロック
-  unlockIosAudio();
+//  unlockIosAudio();
 
   // 開始ビープ前に押込み維持
   startBtn.classList.add('pressed');
