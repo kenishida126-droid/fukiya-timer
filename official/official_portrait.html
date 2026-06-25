@@ -310,25 +310,18 @@ body {
 #startupOverlay{
   position:fixed;
   inset:0;
-
   background:rgba(0,0,0,0.65);
-
   display:flex;
   justify-content:center;
   align-items:center;
-
   z-index:999999;
 }
 
 /* 鍵アイコン */
 #startupBtn{
-
   font-size:120px;
-
   user-select:none;
-
   cursor:pointer;
-
   transition:
       transform 1.2s ease,
       opacity 1.2s ease;
@@ -336,9 +329,7 @@ body {
 
 /* TAP時 */
 #startupBtn.unlock{
-
   transform:scale(2.5);
-
   opacity:0;
 }
 
@@ -607,7 +598,7 @@ startupBtn.addEventListener(
   ()=>{
     warmupSpeech();
     unlockIosAudio();
-    warmupBeep();
+    start_beep(0.0001);
     startupBtn.textContent = '🔓';
     startupBtn.classList.add(
       'unlock'
@@ -1199,39 +1190,9 @@ bounceBtn.addEventListener('click', ()=>{
   }
 });
 
-/* == Ver.10.5a 追加: warmupBeep == */
-function warmupBeep(){
-  const audioCtx =
-    new (
-      window.AudioContext ||
-      window.webkitAudioContext
-    )();
-  const osc =
-    audioCtx.createOscillator();
-  const gain =
-    audioCtx.createGain();
-  osc.type = "square";
-  osc.frequency.setValueAtTime(
-    2100,
-    audioCtx.currentTime
-  );
-  gain.gain.setValueAtTime(
-    0.00001,
-    audioCtx.currentTime
-  );
-  osc.connect(gain);
-  gain.connect(
-    audioCtx.destination
-  );
-  osc.start();
-  osc.stop(
-    audioCtx.currentTime + 0.05
-  );
-}
-
 /* start/reset wiring */
 /* ===== Ver.08.1 追加: start_beep ===== */
-function start_beep() {
+function start_beep(volume = 0.5) {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
   const osc = audioCtx.createOscillator();
@@ -1240,7 +1201,7 @@ function start_beep() {
   osc.type = "square";
   osc.frequency.setValueAtTime(2100, audioCtx.currentTime);
 
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
+  gain.gain.setValueAtTime(volume, audioCtx.currentTime);
   gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5);
 
   osc.connect(gain);
