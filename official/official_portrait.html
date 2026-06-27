@@ -345,7 +345,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪Ver.10.5a Ken.Ishida≫</h2>
+      <h2>≪startupBtn by Gemini≫</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -437,6 +437,7 @@ let audioStartTimeout = null;
 let currentAudioStart = null;
 let wakeLock = null;
 let startTimerTimeout = null;   // ←追加
+let beepAudioCtx = null;   // ←追加(ver.10.5a)
 
 const rounds = [
   "練習ラウンド",
@@ -593,22 +594,27 @@ function unlockIosAudio(){
   iosAudioUnlocked = true;
 }
 
-startupBtn.addEventListener(
-  'click',
-  ()=>{
-    warmupSpeech();
-    unlockIosAudio();
-    start_beep();
-    startupBtn.textContent = '🔓';
-    startupBtn.classList.add(
-      'unlock'
-    );
-    setTimeout(()=>{
-      startupOverlay.style.display =
-        'none';
-    },1200);
+startupBtn.addEventListener('click', () => {
+  // ① 【AudioContextの作成とアクティブ化】Gemini案(ver.10.5a)
+  // ユーザーのタップをトリガーにしているので、iOSのブロックを確実に解除できます
+  if (!beepAudioCtx) {
+    beepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-);
+  if (beepAudioCtx.state === 'suspended') {
+    beepAudioCtx.resume();
+  }
+
+  // ② 【既存のスタートアップ処理】（すべてclickイベントの中に含めます）
+  warmupSpeech();
+  unlockIosAudio();
+  
+  startupBtn.textContent = '🔓';
+  startupBtn.classList.add('unlock');
+  
+  setTimeout(() => {
+    startupOverlay.style.display = 'none';
+  }, 1200);
+}); // ← { once: true } を外し、綺麗にイベントリスナーを閉じます
 
 /* overlay element */
 const mainTitle = document.getElementById('mainTitle'); /* タイトル要素 */
@@ -1191,25 +1197,28 @@ bounceBtn.addEventListener('click', ()=>{
 });
 
 /* start/reset wiring */
-/* ===== Ver.08.1 追加: start_beep ===== */
-function start_beep(volume = 0.5) {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
+/* ===== Ver.08.1 追加: start_beep by Gemini(ver.10.5a)===== */
+function start_beep() {
+  if (!beepAudioCtx) {
+    beepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+  // ★【重要】iOS対策：AudioContextが停止している場合は、再開（resume）させる
+  if (beepAudioCtx.state === 'suspended') {
+    beepAudioCtx.resume();
+  }
+  const osc = beepAudioCtx.createOscillator();
+  const gain = beepAudioCtx.createGain();
   osc.type = "square";
-  osc.frequency.setValueAtTime(2100, audioCtx.currentTime);
-
-  gain.gain.setValueAtTime(volume, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5);
-
+  osc.frequency.setValueAtTime(2100, beepAudioCtx.currentTime);
+  // 音量の初期値
+  gain.gain.setValueAtTime(0.5, beepAudioCtx.currentTime);
+  // 指数関数的に音量を絞る（1.5秒かけて減衰）
+  // ※0にするとエラーになることがあるため、0.0001で正解です！
+  gain.gain.exponentialRampToValueAtTime(0.0001, beepAudioCtx.currentTime + 1.5);
   osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  audioCtx.resume(); // iPhone対策
+  gain.connect(beepAudioCtx.destination);
   osc.start();
-  osc.stop(audioCtx.currentTime + 1.5);
+  osc.stop(beepAudioCtx.currentTime + 1.5);
 }
 
 /* start/reset wiring */
