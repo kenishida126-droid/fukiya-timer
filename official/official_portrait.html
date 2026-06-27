@@ -345,7 +345,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪startupBtn by Gemini≫</h2>
+      <h2>≪改start_beep by Gemini≫</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -1202,23 +1202,29 @@ function start_beep() {
   if (!beepAudioCtx) {
     beepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  // ★【重要】iOS対策：AudioContextが停止している場合は、再開（resume）させる
+  // 実際に音を鳴らす処理を関数として切り出す
+  const playSound = () => {
+    const osc = beepAudioCtx.createOscillator();
+    const gain = beepAudioCtx.createGain();
+    osc.type = "square";
+    osc.frequency.setValueAtTime(2100, beepAudioCtx.currentTime);
+    gain.gain.setValueAtTime(0.5, beepAudioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.0001, beepAudioCtx.currentTime + 1.5);
+    osc.connect(gain);
+    gain.connect(beepAudioCtx.destination);
+    osc.start();
+    osc.stop(beepAudioCtx.currentTime + 1.5);
+  };
+  // 【最重要】iOS対策：もし状態が suspended の場合は、
+  // resume() の完了（.then）を待ってから音を鳴らす
   if (beepAudioCtx.state === 'suspended') {
-    beepAudioCtx.resume();
+    beepAudioCtx.resume().then(() => {
+      playSound();
+    });
+  } else {
+    // すでに running（有効）状態であれば即座に鳴らす
+    playSound();
   }
-  const osc = beepAudioCtx.createOscillator();
-  const gain = beepAudioCtx.createGain();
-  osc.type = "square";
-  osc.frequency.setValueAtTime(2100, beepAudioCtx.currentTime);
-  // 音量の初期値
-  gain.gain.setValueAtTime(0.5, beepAudioCtx.currentTime);
-  // 指数関数的に音量を絞る（1.5秒かけて減衰）
-  // ※0にするとエラーになることがあるため、0.0001で正解です！
-  gain.gain.exponentialRampToValueAtTime(0.0001, beepAudioCtx.currentTime + 1.5);
-  osc.connect(gain);
-  gain.connect(beepAudioCtx.destination);
-  osc.start();
-  osc.stop(beepAudioCtx.currentTime + 1.5);
 }
 
 /* start/reset wiring */
