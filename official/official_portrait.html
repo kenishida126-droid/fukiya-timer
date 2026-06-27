@@ -345,7 +345,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪改start_beep by Gemini≫</h2>
+      <h2>≪startupBtn by Gemini≫</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -595,26 +595,37 @@ function unlockIosAudio(){
 }
 
 startupBtn.addEventListener('click', () => {
-  // ① 【AudioContextの作成とアクティブ化】Gemini案(ver.10.5a)
-  // ユーザーのタップをトリガーにしているので、iOSのブロックを確実に解除できます
+  // ① AudioContextの作成とアクティブ化
   if (!beepAudioCtx) {
     beepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
   if (beepAudioCtx.state === 'suspended') {
     beepAudioCtx.resume();
   }
-
-  // ② 【既存のスタートアップ処理】（すべてclickイベントの中に含めます）
+  // ★【iOS対策の核心】1回目から音を出すためのダミー再生（開通作業）
+  // ユーザーがタップした「この瞬間」に一瞬だけ音を鳴らしてiOSのロックを完全に破壊します
+  try {
+    const dummyOsc = beepAudioCtx.createOscillator();
+    const dummyGain = beepAudioCtx.createGain();
+    // 耳に聞こえない超低音、かつ音量をほぼゼロ（0.00001）にして一瞬だけ鳴らす
+    dummyOsc.frequency.setValueAtTime(1, beepAudioCtx.currentTime);
+    dummyGain.gain.setValueAtTime(0.00001, beepAudioCtx.currentTime);
+    dummyOsc.connect(dummyGain);
+    dummyGain.connect(beepAudioCtx.destination);
+    dummyOsc.start(0);
+    dummyOsc.stop(beepAudioCtx.currentTime + 0.01); // 0.01秒で終了
+  } catch (e) {
+    console.error("ダミー再生失敗:", e);
+  }
+  // ② 既存のスタートアップ処理
   warmupSpeech();
   unlockIosAudio();
-  
   startupBtn.textContent = '🔓';
   startupBtn.classList.add('unlock');
-  
   setTimeout(() => {
     startupOverlay.style.display = 'none';
   }, 1200);
-}); // ← { once: true } を外し、綺麗にイベントリスナーを閉じます
+});
 
 /* overlay element */
 const mainTitle = document.getElementById('mainTitle'); /* タイトル要素 */
@@ -1202,29 +1213,23 @@ function start_beep() {
   if (!beepAudioCtx) {
     beepAudioCtx = new (window.AudioContext || window.webkitAudioContext)();
   }
-  // 実際に音を鳴らす処理を関数として切り出す
-  const playSound = () => {
-    const osc = beepAudioCtx.createOscillator();
-    const gain = beepAudioCtx.createGain();
-    osc.type = "square";
-    osc.frequency.setValueAtTime(2100, beepAudioCtx.currentTime);
-    gain.gain.setValueAtTime(0.5, beepAudioCtx.currentTime);
-    gain.gain.exponentialRampToValueAtTime(0.0001, beepAudioCtx.currentTime + 1.5);
-    osc.connect(gain);
-    gain.connect(beepAudioCtx.destination);
-    osc.start();
-    osc.stop(beepAudioCtx.currentTime + 1.5);
-  };
-  // 【最重要】iOS対策：もし状態が suspended の場合は、
-  // resume() の完了（.then）を待ってから音を鳴らす
+  // ★【重要】iOS対策：AudioContextが停止している場合は、再開（resume）させる
   if (beepAudioCtx.state === 'suspended') {
-    beepAudioCtx.resume().then(() => {
-      playSound();
-    });
-  } else {
-    // すでに running（有効）状態であれば即座に鳴らす
-    playSound();
+    beepAudioCtx.resume();
   }
+  const osc = beepAudioCtx.createOscillator();
+  const gain = beepAudioCtx.createGain();
+  osc.type = "square";
+  osc.frequency.setValueAtTime(2100, beepAudioCtx.currentTime);
+  // 音量の初期値
+  gain.gain.setValueAtTime(0.5, beepAudioCtx.currentTime);
+  // 指数関数的に音量を絞る（1.5秒かけて減衰）
+  // ※0にするとエラーになることがあるため、0.0001で正解です！
+  gain.gain.exponentialRampToValueAtTime(0.0001, beepAudioCtx.currentTime + 1.5);
+  osc.connect(gain);
+  gain.connect(beepAudioCtx.destination);
+  osc.start();
+  osc.stop(beepAudioCtx.currentTime + 1.5);
 }
 
 /* start/reset wiring */
