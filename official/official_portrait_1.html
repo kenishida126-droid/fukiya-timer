@@ -310,10 +310,13 @@ body {
 #startupOverlay{
   position:fixed;
   inset:0;
+
   background:rgba(0,0,0,0.65);
+
   display:flex;
   justify-content:center;
   align-items:center;
+
   z-index:999999;
 }
 
@@ -327,17 +330,43 @@ body {
       opacity 1.2s ease;
 }
 
+#startupBtn img{
+  width: min(35vw,200px);
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
 /* TAP時 */
 #startupBtn.unlock{
   transform:scale(2.5);
   opacity:0;
 }
 
+/* ===== 南京錠解錠中アニメーション ===== */
+@keyframes lockShake {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-5deg); }
+  40%  { transform: rotate(5deg); }
+  60%  { transform: rotate(-5deg); }
+  80%  { transform: rotate(5deg); }
+  100% { transform: rotate(0deg); }
+}
+.unlocking {
+  animation: lockShake 0.5s infinite;
+}
+
 </style>
 </head>
 <body>
   <div id="startupOverlay">
-  <div id="startupBtn">🔒</div>
+  <div id="startupBtn">
+    <img
+      id="startupImg"
+      src="key_lock.png"
+      alt="lock">
+  </div>
   </div>
 
   <div id="overlay"></div>
@@ -345,7 +374,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪start-0 by startup≫</h2>
+      <h2>≪ver.10.5a-260628-4≫</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -437,6 +466,12 @@ let audioStartTimeout = null;
 let currentAudioStart = null;
 let wakeLock = null;
 let startTimerTimeout = null;   // ←追加
+let audioUnlockBusy = false;    // ←追加(ver.10.5a)
+/* == key_unlock.png 先読み == */
+const preloadUnlock =
+  new Image();
+preloadUnlock.src =
+  'key_unlock.png';
 
 const rounds = [
   "練習ラウンド",
@@ -571,45 +606,58 @@ const startupBtn =
    無音再生→即停止してアンロックする。
 */
 let iosAudioUnlocked = false;
-function unlockIosAudio(){
+async function unlockIosAudio(){
   if(iosAudioUnlocked) return;
+  audioUnlockBusy = true;
   const list = [
-    audio30,
-    audioEnd,
-    audioEndHaneya,
-    audioEndTandoku,
-    audioClean
-    // ,audioEndEarly
+    audio30,            //1.5秒
+    audioEnd,           //2.3秒
+    audioEndHaneya,     //6.0秒
+    audioEndTandoku,    //1.0秒
+    audioClean          //2.1秒
+    // ,audioEndEarly   //3.5秒
   ];
-  list.forEach(a=>{
-
+  const jobs = list.map(async a=>{
     if(!a) return;
     try{
       a.muted = true;
       const p = a.play();
-      if(p && p.then) p.then(()=>{ a.pause(); a.currentTime = 0; a.muted = false; });
+      if(p){
+        await p;
+      }
+      a.pause();
+      a.currentTime = 0;
+      a.muted = false;
     }catch(e){}
   });
+  await Promise.all(jobs);
   iosAudioUnlocked = true;
+  audioUnlockBusy = false;
 }
 
 startupBtn.addEventListener(
   'click',
-  ()=>{
-    warmupSpeech();
-    unlockIosAudio();
-    const warmupAudio =
-      new Audio(
-        'start-0.mp3'
-      );
-    warmupAudio.volume =
-      0.001;
-
-warmupAudio.play();
-    startupBtn.textContent = '🔓';
+  async ()=>{
     startupBtn.classList.add(
-      'unlock'
+      'unlocking'
     );
+    await unlockIosAudio();
+    
+    warmupSpeech();
+    await unlockIosAudio();
+    startupBtn.classList.remove(
+      'unlocking'
+    );
+ 
+    document.getElementById(
+      'startupImg'
+    ).src = 'key_unlock.png';
+    setTimeout(()=>{
+      startupBtn.classList.add(
+        'unlock'
+      );
+    },100);
+
     setTimeout(()=>{
       startupOverlay.style.display =
         'none';
@@ -1227,6 +1275,9 @@ if(
     )
 ){
     return;
+}
+if(audioUnlockBusy){
+  return;
 }
 
 //  warmupSpeech();
