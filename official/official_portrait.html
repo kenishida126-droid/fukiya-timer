@@ -322,31 +322,51 @@ body {
 
 /* 鍵アイコン */
 #startupBtn{
-
   font-size:120px;
-
   user-select:none;
-
   cursor:pointer;
-
   transition:
       transform 1.2s ease,
       opacity 1.2s ease;
 }
 
+#startupBtn img{
+  width: min(35vw,200px);
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
 /* TAP時 */
 #startupBtn.unlock{
-
   transform:scale(2.5);
-
   opacity:0;
+}
+
+/* ===== 南京錠解錠中アニメーション ===== */
+@keyframes lockShake {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-5deg); }
+  40%  { transform: rotate(5deg); }
+  60%  { transform: rotate(-5deg); }
+  80%  { transform: rotate(5deg); }
+  100% { transform: rotate(0deg); }
+}
+.unlocking {
+  animation: lockShake 0.5s infinite;
 }
 
 </style>
 </head>
 <body>
   <div id="startupOverlay">
-  <div id="startupBtn">🔒</div>
+  <div id="startupBtn">
+    <img
+      id="startupImg"
+      src="key_lock.png"
+      alt="lock">
+  </div>
   </div>
 
   <div id="overlay"></div>
@@ -354,7 +374,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪unlockIosAudio同期化≫</h2>
+      <h2>≪ver.10.5a-260629-4_chime≫</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -447,6 +467,11 @@ let currentAudioStart = null;
 let wakeLock = null;
 let startTimerTimeout = null;   // ←追加
 let audioUnlockBusy = false;    // ←追加(ver.10.5a)
+/* == key_unlock.png 先読み == */
+const preloadUnlock =
+  new Image();
+preloadUnlock.src =
+  'key_unlock.png';
 
 const rounds = [
   "練習ラウンド",
@@ -613,12 +638,37 @@ async function unlockIosAudio(){
 startupBtn.addEventListener(
   'click',
   async ()=>{
-    warmupSpeech();
-    await unlockIosAudio();
-    startupBtn.textContent = '🔓';
     startupBtn.classList.add(
-      'unlock'
+      'unlocking'
     );
+    const startTime =
+      performance.now();
+    await unlockIosAudio();
+    const elapsed =
+      performance.now() -
+      startTime;
+    const minTime = 1500;
+    if(elapsed < minTime){
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            minTime - elapsed
+          )
+      );
+    }
+    warmupSpeech();
+    startupBtn.classList.remove(
+      'unlocking'
+    );
+    document.getElementById(
+      'startupImg'
+    ).src = 'key_unlock.png';
+    setTimeout(()=>{
+      startupBtn.classList.add(
+        'unlock'
+      );
+    },100);
     setTimeout(()=>{
       startupOverlay.style.display =
         'none';
@@ -1208,6 +1258,7 @@ bounceBtn.addEventListener('click', ()=>{
 
 /* start/reset wiring */
 /* ===== Ver.08.1 追加: start_beep ===== */
+/* === 26/06/29 テストの為の旧start_beep()コメントアウト ===
 function start_beep() {
   const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -1226,6 +1277,55 @@ function start_beep() {
   audioCtx.resume(); // iPhone対策
   osc.start();
   osc.stop(audioCtx.currentTime + 1.5);
+}
+=== 以下のstart_beep()に置き換えてテスト === */
+function start_beep() {
+  playChime();
+}
+
+function playChime() {
+  const audioCtx =
+    new (
+      window.AudioContext ||
+      window.webkitAudioContext
+    )();
+  const now =
+    audioCtx.currentTime;
+  const p = (f,s,d)=>{
+    const o =
+      audioCtx.createOscillator();
+    const g =
+      audioCtx.createGain();
+    o.type = 'triangle';
+    o.frequency.setValueAtTime(
+      f,
+      s
+    );
+    g.gain.setValueAtTime(
+      0.5,
+      s
+    );
+    g.gain.exponentialRampToValueAtTime(
+      0.01,
+      s + d
+    );
+    o.connect(g);
+    g.connect(
+      audioCtx.destination
+    );
+    o.start(s);
+    o.stop(s + d);
+  };
+  p(
+    659.25,
+    now,
+    0.8
+  );
+  p(
+    523.25,
+    now + 0.4,
+    1.2
+  );
 }
 
 /* start/reset wiring */
