@@ -374,7 +374,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪ver.10.5a-260629-4_chime≫</h2>
+      <h2>≪ ver.10.5a Whistle版 ≫</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -456,6 +456,10 @@ body {
   <!--
   <audio id="audioEndEarly" src="end_early.mp3" preload="auto"></audio>
   -->
+  
+  <!-- Web Audio API:start_beep()→mp3file -->
+  <audio id="audioWhistleStart" src="whistle_start.mp3" preload="auto"></audio>
+  <audio id="audioWhistleEnd"   src="whistle_end.mp3"   preload="auto"></audio>
 
 <script>
 /* ===== 状態変数 ===== */
@@ -534,6 +538,8 @@ const audioEnd = document.getElementById('audioEnd');
 const audioEndHaneya = document.getElementById('audioEndHaneya');
 const audioEndTandoku = document.getElementById('audioEndTandoku');
 const audioClean = document.getElementById('audioClean');
+const audioWhistleStart = document.getElementById('audioWhistleStart');
+const audioWhistleEnd = document.getElementById('audioWhistleEnd');
 
 const startAudios = [
   document.getElementById('audioStart0'),
@@ -610,6 +616,8 @@ async function unlockIosAudio(){
   if(iosAudioUnlocked) return;
   audioUnlockBusy = true;
   const list = [
+    audioWhistleStart,  //0.8秒
+    audioWhistleEnd,    //1.4秒
     audio30,            //1.5秒
     audioEnd,           //2.3秒
     audioEndHaneya,     //6.0秒
@@ -871,8 +879,22 @@ function startTimer(){
         audioEndHaneya.play().catch(()=>{});
         // keep wakeLock until user handles reset (per spec)
       } else {
+
+    audioWhistleEnd.currentTime = 0;
+    audioWhistleEnd.play().catch(()=>{});
+    audioWhistleEnd.addEventListener(
+      'ended',
+      function once(){
         audioEnd.currentTime = 0;
         audioEnd.play().catch(()=>{});
+        audioWhistleEnd.removeEventListener(
+          'ended',
+          once
+        );
+      },
+      { once:true }
+    );
+
         if(cleanOn){
           audioEnd.addEventListener('ended', function once(){ setTimeout(()=>{ audioClean.play().catch(()=>{}); },1000); audioEnd.removeEventListener('ended', once); }, { once:true });
         }
@@ -908,7 +930,20 @@ function resetAction(){
   // --- 0:00 & 撥ね矢ON時の特別処理（音は必要）---
   if(bounceOn && remaining === 0){
 
-    audioEndTandoku.play().catch(()=>{});
+    audioWhistleEnd.currentTime = 0;
+    audioWhistleEnd.play().catch(()=>{});
+    audioWhistleEnd.addEventListener(
+      'ended',
+      function once(){
+        audioEndTandoku.currentTime = 0;
+        audioEndTandoku.play().catch(()=>{});
+        audioWhistleEnd.removeEventListener(
+          'ended',
+          once
+        );
+      },
+      { once:true }
+    );
 
     audioEndTandoku.addEventListener('ended', ()=>{
     if(cleanOn){
@@ -1258,77 +1293,8 @@ bounceBtn.addEventListener('click', ()=>{
 
 /* start/reset wiring */
 /* ===== Ver.08.1 追加: start_beep ===== */
-/* === 26/06/29 テストの為の旧start_beep()コメントアウト ===
-function start_beep() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+/* === function start_beep() ver.10.5aで廃棄、mp3で対応=== */
 
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = "square";
-  osc.frequency.setValueAtTime(2100, audioCtx.currentTime);
-
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5);
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  audioCtx.resume(); // iPhone対策
-  osc.start();
-  osc.stop(audioCtx.currentTime + 1.5);
-}
-=== 以下のstart_beep()に置き換えてテスト === */
-function start_beep() {
-  playChime();
-}
-
-function playChime() {
-  const audioCtx =
-    new (
-      window.AudioContext ||
-      window.webkitAudioContext
-    )();
-  const now =
-    audioCtx.currentTime;
-  const p = (f,s,d)=>{
-    const o =
-      audioCtx.createOscillator();
-    const g =
-      audioCtx.createGain();
-    o.type = 'triangle';
-    o.frequency.setValueAtTime(
-      f,
-      s
-    );
-    g.gain.setValueAtTime(
-      0.5,
-      s
-    );
-    g.gain.exponentialRampToValueAtTime(
-      0.01,
-      s + d
-    );
-    o.connect(g);
-    g.connect(
-      audioCtx.destination
-    );
-    o.start(s);
-    o.stop(s + d);
-  };
-  p(
-    659.25,
-    now,
-    0.8
-  );
-  p(
-    523.25,
-    now + 0.4,
-    1.2
-  );
-}
-
-/* start/reset wiring */
 startBtn.addEventListener('click', ()=>{
 if(
     startBtn.classList.contains(
@@ -1351,7 +1317,10 @@ if(audioUnlockBusy){
   startBtn.classList.add('pressed');
 
   // Ver.08.1: 開始ビープ
-  start_beep();
+  //start_beep();
+
+  audioWhistleStart.currentTime = 0;
+  audioWhistleStart.play().catch(()=>{});
 
   // 上級テク: 少し遅らせてタイマー開始（ビープ優先）
   if(startTimerTimeout){
@@ -1923,17 +1892,21 @@ function handleEarlyEnd(){
   }
   */
 
-  if(audioEndTandoku){
-    audioEndTandoku.currentTime = 0;
-    const p = audioEndTandoku.play();
+  if(audioWhistleEnd){
+    audioWhistleEnd.currentTime = 0;
+    const p = audioWhistleEnd.play();
     if(p && p.catch){ p.catch(()=>{}); }
-    audioEndTandoku.addEventListener('ended', ()=>{
+    audioWhistleEnd.addEventListener('ended', ()=>{
+      audioEndTandoku.currentTime = 0;
+      const p2 = audioEndTandoku.play();
+      if(p2 && p2.catch){ p2.catch(()=>{}); }
+      audioEndTandoku.addEventListener('ended', ()=>{
         speakRemaining(remainSec);
+      }, { once:true });
     }, { once:true });
   } else {
-    console.warn('audioEndTandoku が見つかりません');
+    console.warn('audioWhistleEnd が見つかりません');
   }
-
 
   started = false;
 
