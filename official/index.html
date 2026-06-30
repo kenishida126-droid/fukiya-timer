@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="UTF-8">
-<title>スポーツ吹矢タイマー ≪Ver.10.4a Ken.Ishida≫</title>
+<title>スポーツ吹矢タイマー ≪Ver.10.5a Ken.Ishida≫</title>
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 <style>
 :root{
@@ -150,6 +150,7 @@ body{
   box-shadow: 0 6px 12px rgba(0,0,0,0.35), inset 0 2px 4px rgba(255,255,255,0.12);
   transition: all 0.12s ease; display:flex; align-items:center; justify-content:center;
 }
+/*4ボタン、斜光/キラキラ/輝き、2026/06/13 再開
 /* ----- 修正点 (斜光輝き強化: Ver.05.8準拠へ復活) ----- */
 /* ::before shine をやや強め、内側ハイライトを併せて復活（Ver.05.8準拠の見え方へ） */
 .btn::before{
@@ -157,6 +158,7 @@ body{
   background: linear-gradient(120deg, rgba(255,255,255,0) 0%, rgba(255,255,255,0.35) 50%, rgba(255,255,255,0) 100%);
   transform: skewX(-20deg); pointer-events:none; animation: shine 2.2s infinite linear;
 }
+
 /* ----- end 修正 ----- */
 @keyframes shine{ 0% { left:-75%; } 100% { left:100%; } }
 
@@ -272,7 +274,7 @@ body {
   position: fixed;
   inset: 0;
   background: rgba(0,0,0,0.65);/* 不透明度65% */
-  color: gold;
+  color: lime;
 
   display: none;
   justify-content: center;
@@ -304,15 +306,75 @@ body {
   animation: roundPulse 0.8s cubic-bezier(.2,1.7,.4,1) 1;
 }
 
+/* 起動時オーバレイ */
+#startupOverlay{
+  position:fixed;
+  inset:0;
+
+  background:rgba(0,0,0,0.65);
+
+  display:flex;
+  justify-content:center;
+  align-items:center;
+
+  z-index:999999;
+}
+
+/* 鍵アイコン */
+#startupBtn{
+  font-size:120px;
+  user-select:none;
+  cursor:pointer;
+  transition:
+      transform 1.2s ease,
+      opacity 1.2s ease;
+}
+
+#startupBtn img{
+  width: min(35vw,200px);
+  height: auto;
+  display: block;
+  user-select: none;
+  pointer-events: none;
+}
+
+/* TAP時 */
+#startupBtn.unlock{
+  transform:scale(2.5);
+  opacity:0;
+}
+
+/* ===== 南京錠解錠中アニメーション ===== */
+@keyframes lockShake {
+  0%   { transform: rotate(0deg); }
+  20%  { transform: rotate(-5deg); }
+  40%  { transform: rotate(5deg); }
+  60%  { transform: rotate(-5deg); }
+  80%  { transform: rotate(5deg); }
+  100% { transform: rotate(0deg); }
+}
+.unlocking {
+  animation: lockShake 0.5s infinite;
+}
+
 </style>
 </head>
 <body>
+  <div id="startupOverlay">
+  <div id="startupBtn">
+    <img
+      id="startupImg"
+      src="key_lock.png"
+      alt="lock">
+  </div>
+  </div>
+
   <div id="overlay"></div>
 
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪Ver.10.4a Ken.Ishida≫</h2>
+      <h2>《ver.10.5a Ken.Ishida》</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -374,8 +436,16 @@ body {
       <label title="tone-5"><input type="radio" name="metronomeTone" id="tone-5" value="5"></label>
       <label title="tone-6"><input type="radio" name="metronomeTone" id="tone-6" value="6"></label>
     </div>
-
   </div>
+
+  <!-- start-x preload -->
+  <audio id="audioStart0" src="start-0.mp3" preload="auto"></audio>
+  <audio id="audioStart1" src="start-1.mp3" preload="auto"></audio>
+  <audio id="audioStart2" src="start-2.mp3" preload="auto"></audio>
+  <audio id="audioStart3" src="start-3.mp3" preload="auto"></audio>
+  <audio id="audioStart4" src="start-4.mp3" preload="auto"></audio>
+  <audio id="audioStart5" src="start-5.mp3" preload="auto"></audio>
+  <audio id="audioStart6" src="start-6.mp3" preload="auto"></audio>
 
   <!-- audio elements -->
   <audio id="audio30" src="30sec.mp3" preload="auto"></audio>
@@ -383,9 +453,13 @@ body {
   <audio id="audioEndHaneya" src="end_haneya.mp3" preload="auto"></audio>
   <audio id="audioEndTandoku" src="end_tandoku.mp3" preload="auto"></audio>
   <audio id="audioClean" src="clean.mp3" preload="auto"></audio>
-<!--
+  <!--
   <audio id="audioEndEarly" src="end_early.mp3" preload="auto"></audio>
--->
+  -->
+  
+  <!-- Web Audio API:start_beep()→mp3file -->
+  <audio id="audioWhistleStart" src="whistle_start.mp3" preload="auto"></audio>
+  <audio id="audioWhistleEnd"   src="whistle_end.mp3"   preload="auto"></audio>
 
 <script>
 /* ===== 状態変数 ===== */
@@ -395,6 +469,13 @@ let started = false;
 let audioStartTimeout = null;
 let currentAudioStart = null;
 let wakeLock = null;
+let startTimerTimeout = null;   // ←追加
+let audioUnlockBusy = false;    // ←追加(ver.10.5a)
+/* == key_unlock.png 先読み == */
+const preloadUnlock =
+  new Image();
+preloadUnlock.src =
+  'key_unlock.png';
 
 const rounds = [
   "練習ラウンド",
@@ -457,7 +538,72 @@ const audioEnd = document.getElementById('audioEnd');
 const audioEndHaneya = document.getElementById('audioEndHaneya');
 const audioEndTandoku = document.getElementById('audioEndTandoku');
 const audioClean = document.getElementById('audioClean');
+const audioWhistleStart = document.getElementById('audioWhistleStart');
+const audioWhistleEnd = document.getElementById('audioWhistleEnd');
+
+const startAudios = [
+  document.getElementById('audioStart0'),
+  document.getElementById('audioStart1'),
+  document.getElementById('audioStart2'),
+  document.getElementById('audioStart3'),
+  document.getElementById('audioStart4'),
+  document.getElementById('audioStart5'),
+  document.getElementById('audioStart6')
+];
+
+function updateStartButtonReady(){
+    const audioStart =
+        startAudios[roundIndex];
+    if(audioStart.readyState >= 4){
+        startBtn.classList.remove(
+            "audioNotReady"
+        );
+        if(!started){
+            startBtn.classList.remove(
+                "pressed"
+            );
+        }
+    }else{
+        startBtn.classList.add(
+            "audioNotReady"
+        );
+        startBtn.classList.add(
+            "pressed"
+        );
+        audioStart.addEventListener(
+            "canplaythrough",
+            ()=>{
+                startBtn.classList.remove(
+                    "audioNotReady"
+                );
+                if(!started){
+                    startBtn.classList.remove(
+                        "pressed"
+                    );
+                }
+            },
+            { once:true }
+        );
+    }
+}
+
+window.addEventListener('load', ()=>{
+    startAudios.forEach(audio=>{
+        audio.load();
+    });
+    updateStartButtonReady();
+});
+
 const timeOverlay = document.getElementById('timeOverlay');
+const startupOverlay =
+    document.getElementById(
+        'startupOverlay'
+    );
+
+const startupBtn =
+    document.getElementById(
+        'startupBtn'
+    );
 
 /* === iOS audio unlock (必須) ===
    iOS Safari は「最初のユーザー操作」で
@@ -466,26 +612,79 @@ const timeOverlay = document.getElementById('timeOverlay');
    無音再生→即停止してアンロックする。
 */
 let iosAudioUnlocked = false;
-function unlockIosAudio(){
+async function unlockIosAudio(){
   if(iosAudioUnlocked) return;
+  audioUnlockBusy = true;
   const list = [
-    audio30,
-    audioEnd,
-    audioEndHaneya,
-    audioEndTandoku,
-    audioClean
-    // ,audioEndEarly
-    ];
-  list.forEach(a=>{
+    audioWhistleStart,  //0.8秒
+    audioWhistleEnd,    //1.4秒
+    audio30,            //1.5秒
+    audioEnd,           //2.3秒
+    audioEndHaneya,     //6.0秒
+    audioEndTandoku,    //1.0秒
+    audioClean          //2.1秒
+    // ,audioEndEarly   //3.5秒
+  ];
+  const jobs = list.map(async a=>{
     if(!a) return;
     try{
       a.muted = true;
       const p = a.play();
-      if(p && p.then) p.then(()=>{ a.pause(); a.currentTime = 0; a.muted = false; });
+      if(p){
+        await p;
+      }
+      a.pause();
+      a.currentTime = 0;
+      a.muted = false;
     }catch(e){}
   });
+  await Promise.all(jobs);
   iosAudioUnlocked = true;
-} /* overlay element */
+  audioUnlockBusy = false;
+}
+
+startupBtn.addEventListener(
+  'click',
+  async ()=>{
+    startupBtn.classList.add(
+      'unlocking'
+    );
+    const startTime =
+      performance.now();
+    await unlockIosAudio();
+    const elapsed =
+      performance.now() -
+      startTime;
+    const minTime = 1500;
+    if(elapsed < minTime){
+      await new Promise(
+        resolve =>
+          setTimeout(
+            resolve,
+            minTime - elapsed
+          )
+      );
+    }
+    warmupSpeech();
+    startupBtn.classList.remove(
+      'unlocking'
+    );
+    document.getElementById(
+      'startupImg'
+    ).src = 'key_unlock.png';
+    setTimeout(()=>{
+      startupBtn.classList.add(
+        'unlock'
+      );
+    },100);
+    setTimeout(()=>{
+      startupOverlay.style.display =
+        'none';
+    },1200);
+  }
+);
+
+/* overlay element */
 const mainTitle = document.getElementById('mainTitle'); /* タイトル要素 */
 
 /* helper: format time */
@@ -622,25 +821,52 @@ function startTimer(){
   startBtn.classList.add('locked');
 
   // start audio that should finish exactly when remaining reaches 180
-  const audioStart = new Audio(`start-${roundIndex}.mp3`);
+  const audioStart = startAudios[roundIndex];
   currentAudioStart = audioStart;
-  audioStart.preload = 'auto';
-  audioStart.addEventListener('loadedmetadata', ()=>{
-    const dur = audioStart.duration || 0;
-    const playAt = 180 + dur;
-    const delaySeconds = remaining - playAt;
-    const delayMs = Math.max(0, Math.round(delaySeconds*1000));
-    if(audioStartTimeout){ clearTimeout(audioStartTimeout); audioStartTimeout=null; }
-    if(delayMs === 0) audioStart.play().catch(()=>{});
-    else audioStartTimeout = setTimeout(()=>{ audioStart.play().catch(()=>{}); audioStartTimeout=null; }, delayMs);
-  });
-  audioStart.load();
+  audioStart.currentTime = 0;
+
+  const scheduleStartAudio = ()=>{
+      const dur = audioStart.duration || 0;
+      const playAt = 180 + dur;
+      const delaySeconds = remaining - playAt;
+      const delayMs = Math.max(
+          0,
+          Math.round(delaySeconds * 1000)
+      );
+
+      if(audioStartTimeout){
+          clearTimeout(audioStartTimeout);
+          audioStartTimeout = null;
+      }
+
+      if(delayMs === 0){
+          audioStart.play().catch(()=>{});
+      }else{
+          audioStartTimeout = setTimeout(()=>{
+              audioStart.play().catch(()=>{});
+              audioStartTimeout = null;
+          }, delayMs);
+      }
+  };
+
+  if(audioStart.readyState >= 1){
+      scheduleStartAudio();
+  }else{
+      audioStart.addEventListener(
+          'loadedmetadata',
+          scheduleStartAudio,
+          { once:true }
+      );
+  }
 
   timer = setInterval(()=>{
     remaining--;
     updateDisplay();
 
-    if(remaining === 30) audio30.play().catch(()=>{});
+    if(remaining === 30){
+       audio30.currentTime = 0;
+       audio30.play().catch(()=>{});
+    }
 
     if(remaining === 0){
       setBounceVisual();
@@ -653,7 +879,22 @@ function startTimer(){
         audioEndHaneya.play().catch(()=>{});
         // keep wakeLock until user handles reset (per spec)
       } else {
+
+    audioWhistleEnd.currentTime = 0;
+    audioWhistleEnd.play().catch(()=>{});
+    audioWhistleEnd.addEventListener(
+      'ended',
+      function once(){
+        audioEnd.currentTime = 0;
         audioEnd.play().catch(()=>{});
+        audioWhistleEnd.removeEventListener(
+          'ended',
+          once
+        );
+      },
+      { once:true }
+    );
+
         if(cleanOn){
           audioEnd.addEventListener('ended', function once(){ setTimeout(()=>{ audioClean.play().catch(()=>{}); },1000); audioEnd.removeEventListener('ended', once); }, { once:true });
         }
@@ -677,23 +918,48 @@ function startTimer(){
 
 /* reset action / 撥矢/終了 handling */
 function resetAction(){
-  
+
+  // 開始予約キャンセル
+  if(startTimerTimeout){
+    clearTimeout(startTimerTimeout);
+    startTimerTimeout = null;
+  }
+
   // ★Ver.09.2 改訂版：音は残して、1回で完全初期化
 
   // --- 0:00 & 撥ね矢ON時の特別処理（音は必要）---
   if(bounceOn && remaining === 0){
 
-    audioEndTandoku.play().catch(()=>{});
+    audioWhistleEnd.currentTime = 0;
+    audioWhistleEnd.play().catch(()=>{});
+    audioWhistleEnd.addEventListener(
+      'ended',
+      function once(){
+        audioEndTandoku.currentTime = 0;
+        audioEndTandoku.play().catch(()=>{});
+        audioWhistleEnd.removeEventListener(
+          'ended',
+          once
+        );
+      },
+      { once:true }
+    );
 
     audioEndTandoku.addEventListener('ended', ()=>{
-
-      if(cleanOn){
-        setTimeout(()=>{ audioClean.play().catch(()=>{}); },1000);
+    if(cleanOn){
+        setTimeout(()=>{
+          audioClean.play().catch(()=>{});
+          audioClean.addEventListener(
+            'ended',
+            ()=>{
+              finalizeReset();
+            },
+            { once:true }
+          );
+        },1000);
+      }else{
+        finalizeReset();
       }
-
-      // ★ここで完全初期化（1回で終わらせる）
-      finalizeReset();
-
     }, { once:true });
 
     return;
@@ -740,6 +1006,7 @@ function finalizeReset(){
     try{ window.currentTolkAudio.pause(); window.currentTolkAudio.currentTime = 0; }catch(e){}
     window.currentTolkAudio = null;
   }
+  updateStartButtonReady();
 }
 
 /*↓↓↓↓ここから入替*round select update */
@@ -859,8 +1126,10 @@ function showRoundOverlay(num){
 
 /* ===== ショートタップ（完全従来順）===== */
 function handleRoundShortTap(){
+  if(started) return;
   roundIndex = (roundIndex + 1) % rounds.length;
   updateRoundLabel();
+  updateStartButtonReady();
 }
 
 /* ===== ロングタップメニュー ===== */
@@ -897,8 +1166,10 @@ function showRoundMenu(){
 
 
     item.addEventListener("click", ()=>{
+      if(started) return;
       roundIndex = i;
       updateRoundLabel();
+      updateStartButtonReady();
       closeRoundMenu();
     });
 
@@ -1022,42 +1293,49 @@ bounceBtn.addEventListener('click', ()=>{
 
 /* start/reset wiring */
 /* ===== Ver.08.1 追加: start_beep ===== */
-function start_beep() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+/* === function start_beep() ver.10.5aで廃棄、mp3で対応=== */
 
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = "square";
-  osc.frequency.setValueAtTime(2100, audioCtx.currentTime);
-
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5);
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  audioCtx.resume(); // iPhone対策
-  osc.start();
-  osc.stop(audioCtx.currentTime + 1.5);
+startBtn.addEventListener('click', ()=>{
+if(
+    startBtn.classList.contains(
+        "audioNotReady"
+    )
+){
+    return;
+}
+if(audioUnlockBusy){
+  return;
 }
 
-/* start/reset wiring */
-startBtn.addEventListener('click', ()=>{
-  warmupSpeech();
+//  warmupSpeech();
   if(startBtn.classList.contains('locked')) return; // ←追加
 
   // iOS 対策: ユーザー操作中に audio をアンロック
-  unlockIosAudio();
+//  unlockIosAudio();
+
+  // 開始ビープ前に押込み維持
+  startBtn.classList.add('pressed');
 
   // Ver.08.1: 開始ビープ
-  start_beep();
+  //start_beep();
+
+  audioWhistleStart.currentTime = 0;
+  audioWhistleStart.play().catch(()=>{});
 
   // 上級テク: 少し遅らせてタイマー開始（ビープ優先）
-  setTimeout(()=>{
-    if(!timer) startTimer();
-  }, 100);
+  if(startTimerTimeout){
+    clearTimeout(startTimerTimeout);
+  }
+
+  startTimerTimeout = setTimeout(()=>{
+    startTimerTimeout = null;
+
+    if(!timer){
+      startTimer();
+    }
+  },100);
 });
+
 resetBtn.addEventListener('click', ()=>{ resetAction(); });
 
 /* wallpaper handling: build list of available wallpaper-N.jpg */
@@ -1347,12 +1625,47 @@ metroToggle.addEventListener('change', ()=>{
 
 /* small tap bounce visual for buttons (like Ver.05.8) */
 function addTapBounce(elem){
-  elem.addEventListener('pointerdown', ()=>{ elem.classList.add('pressed'); setTimeout(()=>{ if(!elem.classList.contains('locked')) elem.classList.remove('pressed'); }, 250); });
-  elem.addEventListener('pointerup', ()=>{ if(!elem.classList.contains('locked')) elem.classList.remove('pressed'); });
-  elem.addEventListener('pointercancel', ()=>{ if(!elem.classList.contains('locked')) elem.classList.remove('pressed'); });
-  elem.addEventListener('pointerleave', ()=>{ if(!elem.classList.contains('locked')) elem.classList.remove('pressed'); });
+  elem.addEventListener('pointerdown', ()=>{
+    elem.classList.add('pressed');
+    setTimeout(()=>{
+      if(
+        !elem.classList.contains('locked') &&
+        !elem.classList.contains('audioNotReady')
+      ){
+        elem.classList.remove('pressed');
+      }
+    },250);
+  });
+  elem.addEventListener('pointerup', ()=>{
+    if(
+      !elem.classList.contains('locked') &&
+      !elem.classList.contains('audioNotReady')
+    ){
+      elem.classList.remove('pressed');
+    }
+  });
+  elem.addEventListener('pointercancel', ()=>{
+    if(
+      !elem.classList.contains('locked') &&
+      !elem.classList.contains('audioNotReady')
+    ){
+      elem.classList.remove('pressed');
+    }
+  });
+  elem.addEventListener('pointerleave', ()=>{
+    if(
+      !elem.classList.contains('locked') &&
+      !elem.classList.contains('audioNotReady')
+    ){
+      elem.classList.remove('pressed');
+    }
+  });
 }
-addTapBounce(startBtn); addTapBounce(resetBtn); addTapBounce(cleanBtn); addTapBounce(bounceBtn);
+
+//addTapBounce(startBtn); 
+addTapBounce(resetBtn); 
+addTapBounce(cleanBtn); 
+addTapBounce(bounceBtn);
 
 /* =========================
    Ver.06.1: Time-tap handling
@@ -1476,6 +1789,13 @@ mainTitle.addEventListener('click', async (ev)=>{
   started = false;
   pulseFired = { "3_05": false, "3_00": false, "0_30": false, "0_10": false, "0_00": false };
 
+  // set visuals for clean/bounce initial states
+  setCleanVisual();
+  setBounceVisual();
+
+  // initial display
+  updateDisplay();
+
   // Ensure selection cleared on startup
   selectedStartSeconds = null;
   selectionIndex = -1;
@@ -1524,13 +1844,6 @@ mainTitle.addEventListener('click', async (ev)=>{
   // probe external tones (non-blocking but awaited)
   await probeExternalTones();
 
-  // set visuals for clean/bounce initial states
-  setCleanVisual();
-  setBounceVisual();
-
-  // initial display
-  updateDisplay();
-
   // address bar hide heuristic (scroll)
   function scrollToTop(){ try{ window.scrollTo(0,1); }catch(e){} }
   window.addEventListener('load', ()=>{ setTimeout(scrollToTop, 500); });
@@ -1543,7 +1856,7 @@ mainTitle.addEventListener('click', async (ev)=>{
 // HTMLに以下を追加すること
 // <audio id="audioEndEarly" src="end_early.mp3" preload="auto"></audio>
 // const audioEndEarly = document.getElementById('audioEndEarly');
-// ↑2026.06.15.commentout
+
 /* ★重要：iOS用アンロック対象に追加すること
    既存の unlockIosAudio() 内の list に audioEndEarly を追加してください
    例：
@@ -1566,29 +1879,34 @@ function handleEarlyEnd(){
     currentAudioStart = null;
   }
 
-/*
-if(audioEndEarly){
-  audioEndEarly.currentTime = 0;
-  const p = audioEndEarly.play();
-  if(p && p.catch){ p.catch(()=>{}); }
-  audioEndEarly.addEventListener('ended', ()=>{
-      speakRemaining(remainSec);
-  }, { once:true });
-} else {
-  console.warn('audioEndEarly が見つかりません');
-}
-*/
+  /*
+  if(audioEndEarly){
+    audioEndEarly.currentTime = 0;
+    const p = audioEndEarly.play();
+    if(p && p.catch){ p.catch(()=>{}); }
+    audioEndEarly.addEventListener('ended', ()=>{
+        speakRemaining(remainSec);
+    }, { once:true });
+  } else {
+    console.warn('audioEndEarly が見つかりません');
+  }
+  */
 
-if(audioEndTandoku){
-  audioEndTandoku.currentTime = 0;
-  const p = audioEndTandoku.play();
-  if(p && p.catch){ p.catch(()=>{}); }
-  audioEndTandoku.addEventListener('ended', ()=>{
-      speakRemaining(remainSec);
-  }, { once:true });
-} else {
-  console.warn('audioEndTandoku が見つかりません');
-}
+  if(audioWhistleEnd){
+    audioWhistleEnd.currentTime = 0;
+    const p = audioWhistleEnd.play();
+    if(p && p.catch){ p.catch(()=>{}); }
+    audioWhistleEnd.addEventListener('ended', ()=>{
+      audioEndTandoku.currentTime = 0;
+      const p2 = audioEndTandoku.play();
+      if(p2 && p2.catch){ p2.catch(()=>{}); }
+      audioEndTandoku.addEventListener('ended', ()=>{
+        speakRemaining(remainSec);
+      }, { once:true });
+    }, { once:true });
+  } else {
+    console.warn('audioWhistleEnd が見つかりません');
+  }
 
   started = false;
 
@@ -1618,7 +1936,7 @@ function speakRemaining(sec){
     if(!('speechSynthesis' in window)) return;
 
     const msg = new SpeechSynthesisUtterance(
-    `少し早すぎます、${sec}秒、残ってました。`
+      `少し早すぎます、${sec}秒、残ってました。`
     );
     msg.lang = 'ja-JP';
     msg.rate = 1.0;
@@ -1831,8 +2149,10 @@ document.addEventListener('keydown', (e)=>{
 
     // === ラウンド切替 0～6 ===
     if(/^[0-6]$/.test(key)){
+      if(started) return;
       roundIndex = Number(key);
       updateRoundLabel();
+      updateStartButtonReady();
       showRoundOverlay(key);
   }
 
