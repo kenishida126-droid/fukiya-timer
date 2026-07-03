@@ -1319,7 +1319,7 @@ bounceBtn.addEventListener('click', ()=>{
 /* ===== Ver.08.1 追加: start_beep ===== */
 /* === function start_beep() ver.10.5aで廃棄、mp3で対応=== */
 
-startBtn.addEventListener('click', async ()=>{
+startBtn.addEventListener('click', ()=>{
   if(
       startBtn.classList.contains(
           "audioNotReady"
@@ -1337,13 +1337,14 @@ startBtn.addEventListener('click', async ()=>{
     if(audioEndHaneya){
       audioEndHaneya.muted = true;
       audioEndHaneya.currentTime = 0;
-      const p = audioEndHaneya.play();
-      if(p){
-        await p;
-      }
-      audioEndHaneya.pause();
-      audioEndHaneya.currentTime = 0;
-      audioEndHaneya.muted = false;
+      audioEndHaneya.play().catch(()=>{});
+      setTimeout(()=>{
+        try{
+          audioEndHaneya.pause();
+          audioEndHaneya.currentTime = 0;
+          audioEndHaneya.muted = false;
+        }catch(e){}
+      },100);
     }
   }catch(e){
     console.warn(
@@ -1353,8 +1354,10 @@ startBtn.addEventListener('click', async ()=>{
   }
   // 開始ビープ前に押込み維持
   startBtn.classList.add('pressed');
+  // Ver.10.5a
   audioWhistleStart.currentTime = 0;
   audioWhistleStart.play().catch(()=>{});
+  // 上級テク: 少し遅らせてタイマー開始（ビープ優先）
   if(startTimerTimeout){
     clearTimeout(startTimerTimeout);
   }
