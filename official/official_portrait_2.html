@@ -325,6 +325,7 @@ body {
   font-size:120px;
   user-select:none;
   cursor:pointer;
+  -webkit-tap-highlight-color: transparent;  /*🔒ボタンTAP時のTap Highlight抑止*/
   transition:
       transform 1.2s ease,
       opacity 1.2s ease;
@@ -374,7 +375,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>≪ver.10.5a-260629-2≫</h2>
+      <h2>《ver.10.5a-260703-2》</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -453,9 +454,11 @@ body {
   <audio id="audioEndHaneya" src="end_haneya.mp3" preload="auto"></audio>
   <audio id="audioEndTandoku" src="end_tandoku.mp3" preload="auto"></audio>
   <audio id="audioClean" src="clean.mp3" preload="auto"></audio>
-  <!--
   <audio id="audioEndEarly" src="end_early.mp3" preload="auto"></audio>
-  -->
+  
+  <!-- Web Audio API:start_beep()→mp3file -->
+  <audio id="audioWhistleStart" src="whistle_start.mp3" preload="auto"></audio>
+  <audio id="audioWhistleEnd"   src="whistle_end.mp3"   preload="auto"></audio>
 
 <script>
 /* ===== 状態変数 ===== */
@@ -533,7 +536,10 @@ const audio30 = document.getElementById('audio30');
 const audioEnd = document.getElementById('audioEnd');
 const audioEndHaneya = document.getElementById('audioEndHaneya');
 const audioEndTandoku = document.getElementById('audioEndTandoku');
+const audioEndEarly = document.getElementById('audioEndEarly');
 const audioClean = document.getElementById('audioClean');
+const audioWhistleStart = document.getElementById('audioWhistleStart');
+const audioWhistleEnd = document.getElementById('audioWhistleEnd');
 
 const startAudios = [
   document.getElementById('audioStart0'),
@@ -610,25 +616,51 @@ async function unlockIosAudio(){
   if(iosAudioUnlocked) return;
   audioUnlockBusy = true;
   const list = [
-    audio30,            //1.5秒
+    //audioEndHaneya,     //6.0秒→4.5秒短縮版(260703)
     audioEnd,           //2.3秒
-    audioEndHaneya,     //6.0秒
+    audioEndEarly,      //2.1秒
     audioEndTandoku,    //1.0秒
-    audioClean          //2.1秒
-    // ,audioEndEarly   //3.5秒
+    audioClean,         //2.1秒
+    audioWhistleStart,  //0.8秒
+    audioWhistleEnd,    //1.4秒
+    audio30             //1.5秒
   ];
   const jobs = list.map(async a=>{
     if(!a) return;
     try{
+      a.currentTime = 0;
       a.muted = true;
-      const p = a.play();
-      if(p){
-        await p;
-      }
+      await new Promise(async (resolve,reject)=>{
+        const endedHandler = ()=>{
+          a.removeEventListener(
+            'ended',
+            endedHandler
+          );
+          resolve();
+        };
+        a.addEventListener(
+          'ended',
+          endedHandler,
+          { once:true }
+        );
+        try{
+          const p = a.play();
+          if(p) await p;
+        }catch(e){
+          reject(e);
+        }
+      });
       a.pause();
       a.currentTime = 0;
       a.muted = false;
-    }catch(e){}
+    }catch(e){
+      console.error(
+        'unlock error:',
+        a?.id,
+        e
+      );
+      throw e;
+    }
   });
   await Promise.all(jobs);
   iosAudioUnlocked = true;
@@ -871,8 +903,22 @@ function startTimer(){
         audioEndHaneya.play().catch(()=>{});
         // keep wakeLock until user handles reset (per spec)
       } else {
+
+    audioWhistleEnd.currentTime = 0;
+    audioWhistleEnd.play().catch(()=>{});
+    audioWhistleEnd.addEventListener(
+      'ended',
+      function once(){
         audioEnd.currentTime = 0;
         audioEnd.play().catch(()=>{});
+        audioWhistleEnd.removeEventListener(
+          'ended',
+          once
+        );
+      },
+      { once:true }
+    );
+
         if(cleanOn){
           audioEnd.addEventListener('ended', function once(){ setTimeout(()=>{ audioClean.play().catch(()=>{}); },1000); audioEnd.removeEventListener('ended', once); }, { once:true });
         }
@@ -908,7 +954,20 @@ function resetAction(){
   // --- 0:00 & 撥ね矢ON時の特別処理（音は必要）---
   if(bounceOn && remaining === 0){
 
-    audioEndTandoku.play().catch(()=>{});
+    audioWhistleEnd.currentTime = 0;
+    audioWhistleEnd.play().catch(()=>{});
+    audioWhistleEnd.addEventListener(
+      'ended',
+      function once(){
+        audioEndTandoku.currentTime = 0;
+        audioEndTandoku.play().catch(()=>{});
+        audioWhistleEnd.removeEventListener(
+          'ended',
+          once
+        );
+      },
+      { once:true }
+    );
 
     audioEndTandoku.addEventListener('ended', ()=>{
     if(cleanOn){
@@ -1258,59 +1317,49 @@ bounceBtn.addEventListener('click', ()=>{
 
 /* start/reset wiring */
 /* ===== Ver.08.1 追加: start_beep ===== */
-function start_beep() {
-  const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+/* === function start_beep() ver.10.5aで廃棄、mp3で対応=== */
 
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = "square";
-  osc.frequency.setValueAtTime(2100, audioCtx.currentTime);
-
-  gain.gain.setValueAtTime(0.5, audioCtx.currentTime);
-  gain.gain.exponentialRampToValueAtTime(0.0001, audioCtx.currentTime + 1.5);
-
-  osc.connect(gain);
-  gain.connect(audioCtx.destination);
-
-  audioCtx.resume(); // iPhone対策
-  osc.start();
-  osc.stop(audioCtx.currentTime + 1.5);
-}
-
-/* start/reset wiring */
-startBtn.addEventListener('click', ()=>{
-if(
-    startBtn.classList.contains(
-        "audioNotReady"
-    )
-){
+startBtn.addEventListener('click', async ()=>{
+  if(
+      startBtn.classList.contains(
+          "audioNotReady"
+      )
+  ){
+      return;
+  }
+  if(audioUnlockBusy){
     return;
-}
-if(audioUnlockBusy){
-  return;
-}
-
+  }
 //  warmupSpeech();
-  if(startBtn.classList.contains('locked')) return; // ←追加
-
-  // iOS 対策: ユーザー操作中に audio をアンロック
-//  unlockIosAudio();
-
+  if(startBtn.classList.contains('locked')) return;
+  // ===== end_haneya専用アンロック =====
+  try{
+    if(audioEndHaneya){
+      audioEndHaneya.muted = true;
+      audioEndHaneya.currentTime = 0;
+      const p = audioEndHaneya.play();
+      if(p){
+        await p;
+      }
+      audioEndHaneya.pause();
+      audioEndHaneya.currentTime = 0;
+      audioEndHaneya.muted = false;
+    }
+  }catch(e){
+    console.warn(
+      'audioEndHaneya unlock error',
+      e
+    );
+  }
   // 開始ビープ前に押込み維持
   startBtn.classList.add('pressed');
-
-  // Ver.08.1: 開始ビープ
-  start_beep();
-
-  // 上級テク: 少し遅らせてタイマー開始（ビープ優先）
+  audioWhistleStart.currentTime = 0;
+  audioWhistleStart.play().catch(()=>{});
   if(startTimerTimeout){
     clearTimeout(startTimerTimeout);
   }
-
   startTimerTimeout = setTimeout(()=>{
     startTimerTimeout = null;
-
     if(!timer){
       startTimer();
     }
@@ -1832,22 +1881,6 @@ mainTitle.addEventListener('click', async (ev)=>{
 })();
 
 /* ===== Ver.09 フル統合版（Ver.08.2 + 早期終了機能） ===== */
-
-/* ===== 追加：早期終了用Audio ===== */
-// HTMLに以下を追加すること
-// <audio id="audioEndEarly" src="end_early.mp3" preload="auto"></audio>
-// const audioEndEarly = document.getElementById('audioEndEarly');
-
-/* ★重要：iOS用アンロック対象に追加すること
-   既存の unlockIosAudio() 内の list に audioEndEarly を追加してください
-   例：
-   const list = [audio30,audioEnd,audioEndHaneya,audioEndTandoku,audioClean,audioEndEarly];
-*/
-
-/* ===== 既存コードはそのまま使用（省略） ===== */
-/* ※ここに謙さんの1028行コードをそのまま貼る */
-
-/* ===== 追加：早期終了処理 ===== */
 function handleEarlyEnd(){
   if(!started) return;
 
@@ -1860,30 +1893,16 @@ function handleEarlyEnd(){
     currentAudioStart = null;
   }
 
-  /*
   if(audioEndEarly){
-    audioEndEarly.currentTime = 0;
-    const p = audioEndEarly.play();
-    if(p && p.catch){ p.catch(()=>{}); }
-    audioEndEarly.addEventListener('ended', ()=>{
-        speakRemaining(remainSec);
-    }, { once:true });
-  } else {
-    console.warn('audioEndEarly が見つかりません');
-  }
-  */
-
-  if(audioEndTandoku){
-    audioEndTandoku.currentTime = 0;
-    const p = audioEndTandoku.play();
-    if(p && p.catch){ p.catch(()=>{}); }
-    audioEndTandoku.addEventListener('ended', ()=>{
-        speakRemaining(remainSec);
-    }, { once:true });
-  } else {
-    console.warn('audioEndTandoku が見つかりません');
-  }
-
+  audioEndEarly.currentTime = 0;
+  const p = audioEndEarly.play();
+  if(p && p.catch){ p.catch(()=>{}); }
+  audioEndEarly.addEventListener('ended', ()=>{
+    speakRemaining(remainSec);
+  }, { once:true });
+} else {
+  console.warn('audioEndEarly が見つかりません');
+}
 
   started = false;
 
