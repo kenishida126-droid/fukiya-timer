@@ -375,7 +375,7 @@ body {
   <div id="content">
     <div id="title">
       <h1 id="mainTitle">スポーツ吹矢タイマー</h1>
-      <h2>《ver.10.5a-260703-2》</h2>
+      <h2>《ver.10.5a 260704-2》</h2>
     </div>
 
     <!-- Round selection (clickable label cycles) -->
@@ -1896,15 +1896,15 @@ function handleEarlyEnd(){
     currentAudioStart = null;
   }
 
-  if(audioEndEarly){
-  audioEndEarly.currentTime = 0;
-  const p = audioEndEarly.play();
+  if(audioEndTandoku){                               //基audioEndEarly
+  audioEndTandoku.currentTime = 0;                   //基audioEndEarly
+  const p = audioEndTandoku.play();                  //基audioEndEarly
   if(p && p.catch){ p.catch(()=>{}); }
-  audioEndEarly.addEventListener('ended', ()=>{
+  audioEndTandoku.addEventListener('ended', ()=>{    //基audioEndEarly
     speakRemaining(remainSec);
   }, { once:true });
 } else {
-  console.warn('audioEndEarly が見つかりません');
+  console.warn('audioEndTandoku が見つかりません');  //基audioEndEarly
 }
 
   started = false;
