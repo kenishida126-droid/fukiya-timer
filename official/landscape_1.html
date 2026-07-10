@@ -519,7 +519,7 @@ body{
                     《 Official Landscape ver.01a 》
                 </span>
                 <span id="titleAuthor">
-                    ～ 260710-4 ～
+                    ～ 260710-5 ～
                 </span>
             </h1>
 
@@ -752,6 +752,21 @@ async function unlockIosAudio(){
   await Promise.all(jobs);
   iosAudioUnlocked = true;
   audioUnlockBusy = false;
+}
+
+async function unlockEndHaneya(){
+    try{
+        audioEndHaneya.currentTime = 0;
+        audioEndHaneya.muted = true;
+        const p =
+            audioEndHaneya.play();
+        if(p){
+            await p;
+        }
+        audioEndHaneya.pause();
+        audioEndHaneya.currentTime = 0;
+        audioEndHaneya.muted = false;
+    }catch(e){}
 }
 
 function doPulse(){
@@ -1295,13 +1310,13 @@ cleanBtn.addEventListener("click",()=>{
 });
 
 bounceBtn.addEventListener("click",()=>{
-
     if(!started){
         return;
     }
-
+    if(!bounceOn){
+        unlockEndHaneya();
+    }
     bounceOn = !bounceOn;
-
     updateBounceButton();
 });
 
