@@ -519,7 +519,7 @@ body{
                     《 Official Landscape ver.01a 》
                 </span>
                 <span id="titleAuthor">
-                    ～ 260710-5 ～
+                    ～ 260711-1 ～
                 </span>
             </h1>
 
@@ -1468,6 +1468,17 @@ updateCleanButton();
 updateBounceButton();
 updateRoundLabel();
 updateStartButtonReady();
+
+/* iPhone対応で追加(開始釦がlockされたまま対応：26/07/11) */
+window.addEventListener(
+    "load",
+    ()=>{
+        startAudios.forEach(audio=>{
+            audio.load();
+        });
+        updateStartButtonReady();
+    }
+);
 
 /* ===== K/B対応 ===== */
 let lastKey = '';
