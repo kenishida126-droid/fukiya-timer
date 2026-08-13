@@ -182,11 +182,13 @@
             currentMetro = 0;
         }
 
-        function toggleMetro(n){
+        async function toggleMetro(n){
             if(audioCtx.state !== 'running'){
-                audioCtx.resume();
+                try {
+                    await audioCtx.resume();
+                } catch(e) {}
             }
-            //unlockAudio();
+            // unlockAudio();
             if(currentMetro === n){
                 clearMetro();
                 return;
