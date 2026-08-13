@@ -165,7 +165,7 @@
                     } catch(e){}
                 }
             },
-            { once:true }
+            { passive:true }
         );
 
         // ★ メトロノーム
@@ -183,24 +183,28 @@
         }
 
         async function toggleMetro(n){
-            if(audioCtx.state !== 'running'){
-                try {
+            try{
+                if(audioCtx.state !== 'running'){
                     await audioCtx.resume();
-                } catch(e) {}
-            }
-            // unlockAudio();
+                }
+            }catch(e){}
+            unlockAudio();
             if(currentMetro === n){
                 clearMetro();
                 return;
             }
+
             if(currentMetro === n){
                 clearMetro();
                 return;
             }
+
             clearMetro();
             currentMetro = n;
+
             const el = document.getElementById('note'+n);
             if(!el) return;
+
             if(n===1) el.classList.add('on-red');
             if(n===2) el.classList.add('on-yellow');
             if(n===3) el.classList.add('on-lime');
