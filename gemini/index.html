@@ -40,7 +40,7 @@
             text-align: center;
             flex-shrink: 0;
         }
-        #title-main { display: inline-block; font-size: 9.5vw; font-weight: bold; line-height: 1.1; transform: scaleX(0.9); }
+        #title-main { display: inline-block; font-size: 8.5vw; font-weight: bold; line-height: 1.1; transform: scaleX(0.9); }
         #title-sub { display: block; font-family: sans-serif; font-size: 7vw; opacity: 0.9; margin-top: -0.5vh; }
 
         #timer-display {
@@ -182,29 +182,23 @@
             currentMetro = 0;
         }
 
-        async function toggleMetro(n){
-            try{
-                if(audioCtx.state !== 'running'){
-                    await audioCtx.resume();
-                }
-            }catch(e){}
+        function toggleMetro(n){
+            if(audioCtx.state !== 'running'){
+                audioCtx.resume();
+            }
             unlockAudio();
             if(currentMetro === n){
                 clearMetro();
                 return;
             }
-
             if(currentMetro === n){
                 clearMetro();
                 return;
             }
-
             clearMetro();
             currentMetro = n;
-
             const el = document.getElementById('note'+n);
             if(!el) return;
-
             if(n===1) el.classList.add('on-red');
             if(n===2) el.classList.add('on-yellow');
             if(n===3) el.classList.add('on-lime');
