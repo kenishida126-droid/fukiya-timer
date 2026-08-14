@@ -165,7 +165,7 @@
                     } catch(e){}
                 }
             },
-            { passive:true }
+            { once:true }
         );
 
         // ★ メトロノーム
@@ -188,8 +188,11 @@
                     await audioCtx.resume();
                 }
             }catch(e){}
+
             unlockAudio();
+            await primeMetroAudio();
             if(currentMetro === n){
+
                 clearMetro();
                 return;
             }
@@ -434,6 +437,25 @@
                 a.play().catch(()=>{});
             }catch(e){}
         }
+        
+        let metroAudioPrimed = false;
+        async function primeMetroAudio(){
+            if(metroAudioPrimed || !audioFiles) return;
+            const a = audioFiles.start;
+            try{
+                a.pause();
+                a.currentTime = 0;
+                a.volume = 0;
+                await a.play();
+                a.pause();
+                a.currentTime = 0;
+                a.volume = 1;
+                metroAudioPrimed = true;
+            }catch(e){
+                a.volume = 1;
+            }
+        }
+        
         function playChime() { const now = audioCtx.currentTime; const p = (f, s, d) => { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(f, s); g.gain.setValueAtTime(0.5, s); g.gain.exponentialRampToValueAtTime(0.01, s + d); o.connect(g); g.connect(audioCtx.destination); o.start(s); o.stop(s + d); }; p(659.25, now, 0.8); p(523.25, now + 0.4, 1.2); }
         
         function updateDisplay() {
