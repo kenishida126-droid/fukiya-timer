@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.4 》</span>
+            <span id="title-sub">《 by Ken.Ishida.5 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -415,7 +415,7 @@
                 };
             }
             [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
-                a.volume = 0.01;
+                a.volume = 0;
                 const p = a.play();
                 if(p){
                     p.then(()=>{
@@ -427,13 +427,17 @@
             });
             audioUnlocked = true;
         }
-        function safePlay(a){
+
+        async function safePlay(a){
             try{
                 a.pause();
                 a.currentTime = 0;
-                a.play().catch(()=>{});
+
+                await a.play();
+
             }catch(e){}
         }
+
         function playChime() { const now = audioCtx.currentTime; const p = (f, s, d) => { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(f, s); g.gain.setValueAtTime(0.5, s); g.gain.exponentialRampToValueAtTime(0.01, s + d); o.connect(g); g.connect(audioCtx.destination); o.start(s); o.stop(s + d); }; p(659.25, now, 0.8); p(523.25, now + 0.4, 1.2); }
         
         function updateDisplay() {
