@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.3 》</span>
+            <span id="title-sub">《 by Ken.Ishida.4 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -415,22 +415,17 @@
                 };
             }
             [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
-                a.volume = 0;
+                a.volume = 0.01;
                 const p = a.play();
                 if(p){
                     p.then(()=>{
                         a.pause();
                         a.currentTime = 0;
-                        a.volume = 1;
-                    }).catch(()=>{
-                        a.volume = 1;
-                    });
-                }else{
-                    a.volume = 1;
+                    }).catch(()=>{});
                 }
+                a.volume = 1;
             });
             audioUnlocked = true;
-
         }
         function safePlay(a){
             try{
