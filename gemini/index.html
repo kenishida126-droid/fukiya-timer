@@ -40,7 +40,7 @@
             text-align: center;
             flex-shrink: 0;
         }
-        #title-main { display: inline-block; font-size: 9.0vw; font-weight: bold; line-height: 1.1; transform: scaleX(0.9); }
+        #title-main { display: inline-block; font-size: 9.5vw; font-weight: bold; line-height: 1.1; transform: scaleX(0.9); }
         #title-sub { display: block; font-family: sans-serif; font-size: 7vw; opacity: 0.9; margin-top: -0.5vh; }
 
         #timer-display {
@@ -188,11 +188,8 @@
                     await audioCtx.resume();
                 }
             }catch(e){}
-
             unlockAudio();
-            await primeMetroAudio();
             if(currentMetro === n){
-
                 clearMetro();
                 return;
             }
@@ -437,25 +434,6 @@
                 a.play().catch(()=>{});
             }catch(e){}
         }
-        
-        let metroAudioPrimed = false;
-        async function primeMetroAudio(){
-            if(metroAudioPrimed || !audioFiles) return;
-            const a = audioFiles.start;
-            try{
-                a.pause();
-                a.currentTime = 0;
-                a.volume = 0;
-                await a.play();
-                a.pause();
-                a.currentTime = 0;
-                a.volume = 1;
-                metroAudioPrimed = true;
-            }catch(e){
-                a.volume = 1;
-            }
-        }
-        
         function playChime() { const now = audioCtx.currentTime; const p = (f, s, d) => { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(f, s); g.gain.setValueAtTime(0.5, s); g.gain.exponentialRampToValueAtTime(0.01, s + d); o.connect(g); g.connect(audioCtx.destination); o.start(s); o.stop(s + d); }; p(659.25, now, 0.8); p(523.25, now + 0.4, 1.2); }
         
         function updateDisplay() {
@@ -522,7 +500,7 @@
 
             // ★ 音声起動時も確実にAudio解放
             unlockAudio();
-            if (audioCtx.state === 'suspended') {
+            if (audioCtx.state !== 'running') {
                 try { await audioCtx.resume(); } catch(e){}
             }
 
