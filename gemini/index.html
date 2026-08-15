@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.2 》</span>
+            <span id="title-sub">《 by Ken.Ishida.3 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -183,12 +183,12 @@
         }
 
         async function toggleMetro(n){
-            unlockAudio();
             try{
                 if(audioCtx.state !== 'running'){
                     await audioCtx.resume();
                 }
             }catch(e){}
+            unlockAudio();
             if(currentMetro === n){
                 clearMetro();
                 return;
@@ -421,11 +421,16 @@
                     p.then(()=>{
                         a.pause();
                         a.currentTime = 0;
-                    }).catch(()=>{});
+                        a.volume = 1;
+                    }).catch(()=>{
+                        a.volume = 1;
+                    });
+                }else{
+                    a.volume = 1;
                 }
-                a.volume = 1;
             });
             audioUnlocked = true;
+
         }
         function safePlay(a){
             try{
