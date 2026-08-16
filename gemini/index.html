@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.2 》</span>
+            <span id="title-sub">《 by Ken.Ishida.01 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -191,18 +191,6 @@
                 }
             }catch(e){}
             unlockAudio();
-
-            if(!window.metroUnlockAudio){
-                window.metroUnlockAudio = new Audio('silent.mp3');
-                window.metroUnlockAudio.volume = 1;
-                window.metroUnlockAudio.preload = 'auto';
-            }
-            try{
-                window.metroUnlockAudio.currentTime = 0;
-                const p = window.metroUnlockAudio.play();
-                if(p) p.catch(()=>{});
-            }catch(e){}
-
             if(currentMetro === n){
                 clearMetro();
                 return;
@@ -419,35 +407,42 @@
 
         let audioFiles = null;
         let audioUnlocked = false;
-        function unlockAudio(){
-            if(audioUnlocked) return;
-            if(!audioFiles){
-                audioFiles = {
-                    start: new Audio('start-0.mp3'),
-                    halfMin: new Audio('30sec.mp3'),
-                    end: new Audio('end.mp3')
-                };
-            }
 
-        [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
-            a.muted = true;
-            a.currentTime = 0;
-            const p = a.play();
-            if(p){
-                p.then(()=>{
-                    a.pause();
-                    a.currentTime = 0;
-                    a.muted = false;
-                }).catch(()=>{
-                    a.muted = false;
-                });
-            }else{
+function unlockAudio(){
+    if(audioUnlocked) return;
+    if(!audioFiles){
+        audioFiles = {
+            start: new Audio('start-0.mp3'),
+            halfMin: new Audio('30sec.mp3'),
+            end: new Audio('end.mp3'),
+            silent: new Audio('silent.mp3')
+        };
+    }
+    [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
+        a.muted = true;
+        a.currentTime = 0;
+        const p = a.play();
+        if(p){
+            p.then(()=>{
+                a.pause();
+                a.currentTime = 0;
                 a.muted = false;
-            }
-        });
-        audioUnlocked = true;
-
+            }).catch(()=>{
+                a.muted = false;
+            });
+        }else{
+            a.muted = false;
         }
+    });
+    audioFiles.silent.currentTime = 0;
+    audioFiles.silent.volume = 1;
+    const silentPlay = audioFiles.silent.play();
+    if(silentPlay){
+        silentPlay.catch(()=>{});
+    }
+   audioUnlocked = true;
+}
+
         function safePlay(a){
             try{
                 a.pause();
