@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.8 》</span>
+            <span id="title-sub">《 by Ken.Ishida.1 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -159,13 +159,22 @@
         document.addEventListener(
             'touchstart',
             async () => {
-                // ★ iPhone：最初のユーザー操作でHTML Audioもunlock
                 unlockAudio();
                 if (audioCtx.state !== 'running') {
                     try {
                         await audioCtx.resume();
                     } catch(e){}
                 }
+                // ★ iPhone Web Audio 初回unlock
+                try{
+                    const osc = audioCtx.createOscillator();
+                    const gain = audioCtx.createGain();
+                    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+                    osc.connect(gain);
+                    gain.connect(audioCtx.destination);
+                    osc.start();
+                    osc.stop(audioCtx.currentTime + 0.01);
+                }catch(e){}
             },
             { once:true }
         );
@@ -184,10 +193,10 @@
             currentMetro = 0;
         }
 
-        function toggleMetro(n){
+        async function toggleMetro(n){
             try{
                 if(audioCtx.state !== 'running'){
-                    audioCtx.resume();
+                    await audioCtx.resume();
                 }
             }catch(e){}
             unlockAudio();
