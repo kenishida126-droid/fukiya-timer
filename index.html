@@ -1,751 +1,270 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>スポーツ吹矢タイマー Gemini version</title>
-    <style>
-        html, body {
-            background-color: #000;
-            color: #fff;
-            margin: 0;
-            padding: 0;
-            height: 100%;
-            width: 100%;
-            overflow-x: hidden;
-            overflow-y: scroll;
-            scroll-snap-type: y mandatory;
-            -webkit-user-select: none;
-            -webkit-touch-callout: none;
-            user-select: none;
-            -webkit-tap-highlight-color: transparent;
-        }
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>吹矢Timer MENU</title>
 
-        #main-wrapper {
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            min-height: 101vh;
-            width: 100%;
-        }
+<!-- favicon -->
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 
-        #snap-point {
-            scroll-snap-align: start;
-            height: 2vh;
-            width: 100%;
-        }
+<link rel="manifest" href="manifest.json">
 
-        #header-container {
-            width: 100%;
-            text-align: center;
-            flex-shrink: 0;
-        }
-        #title-main { display: inline-block; font-size: 9.0vw; font-weight: bold; line-height: 1.1; transform: scaleX(0.9); }
-        #title-sub { display: block; font-family: sans-serif; font-size: 7vw; opacity: 0.9; margin-top: -0.5vh; }
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    background-color: #000;
+    font-family: sans-serif;
+    color: #fff;
+    text-align: center;
+    -webkit-user-select: none;
+    user-select: none;
+  }
 
-        #timer-display {
-            flex-shrink: 0;
-            width: 100%;
-            text-align: center;
-            font-variant-numeric: tabular-nums;
-            font-weight: 900;
-            font-size: 40vw;
-            line-height: 0.75;
-            transform: scale(1.22, 1.5);
-            transform-origin: center;
-            margin-top: 5vh; 
-            margin-bottom: 0;
-            color: lime;
-            cursor: pointer;
-        }
+  h1, h2 {
+    margin: 0.1em 0;
+    animation: fadeIn 1s ease-out;
+  }
 
-        #circle-timer-container {
-            flex-shrink: 0;
-            width: 92vw;
-            height: 92vw;
-            margin-top: 8.5vh; 
-            margin-bottom: 5vh;
-            position: relative;
-        }
+  h1 {
+    font-size: 1.4em;
+    color: gold;
+    margin-top: 0.8em;
+  }
 
-        svg {
-            width: 100%;
-            height: 100%;
-        }
-        
-        .outline { fill: none; stroke: #fff; stroke-width: 1; }
+  h2 {
+    font-size: 1.2em;
+    font-weight: normal;
+    color: white;
+  }
 
-        #mic-button { cursor: pointer; }
-        #mic-circle { fill: #000; stroke: #fff; stroke-width: 2; }
-        .mic-active #mic-icon-group { fill: #f00 !important; stroke: #f00 !important; filter: drop-shadow(0 0 5px #f00); }
-        .mic-waiting #mic-icon-group { animation: mic-blink 1.2s infinite ease-in-out; }
-        @keyframes mic-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
-        #mic-icon-group { fill: #fff; stroke: #fff; }
+  .category-title {
+    width: 80%;
+    max-width: 400px;
+    margin: 0.5em auto 0.2em auto;
+    text-align: left;
+    color: gold;
+    font-size: 1.15em;
+    font-weight: bold;
+  }
 
-        .blink { animation: sharp-blink-op 0.7s steps(1) infinite; }
-        .blink-fast { animation: sharp-blink-op 0.2s steps(1) infinite; }
-        @keyframes sharp-blink-op { 50% { opacity: 0; } }
+  .version-box {
+    background-color: #222;
+    margin: 0.35em auto;
+    padding: 0.7em;
+    width: 80%;
+    max-width: 400px;
+    border-radius: 10px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
 
-        @keyframes rainbow-wave {
-            0% { filter: brightness(0.5); }
-            50% { filter: brightness(1.8) drop-shadow(0 0 10px white); }
-            100% { filter: brightness(0.5); }
-        }
-        .wave-active path {
-            animation: rainbow-wave 2s ease-in-out infinite;
-        }
-        .wave-active path:nth-child(1) { animation-delay: 0.0s; }
-        .wave-active path:nth-child(2) { animation-delay: 0.2s; }
-        .wave-active path:nth-child(3) { animation-delay: 0.4s; }
-        .wave-active path:nth-child(4) { animation-delay: 0.6s; }
-        .wave-active path:nth-child(5) { animation-delay: 0.8s; }
+  .version-box:hover {
+    background-color: #444;
+    transform: scale(1.05);
+  }
 
-        /* ★ メトロノーム */
-        #metronome, .metro-note { fill: white; cursor: pointer; }
-        @keyframes metro-blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
-        .on-red { fill: red !important; animation: metro-blink 1s infinite; }
-        .on-yellow { fill: yellow !important; animation: metro-blink 1s infinite; }
-        .on-lime { fill: lime !important; animation: metro-blink 1s infinite; }
-        .on-aqua { fill: aqua !important; animation: metro-blink 1s infinite; }
-        @keyframes metro-blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
-        .metro-on { fill: red !important; animation: metro-blink 1s infinite; }
-    </style>
+  .version-title {
+    font-size:1.35em;
+    font-weight:bold;
+    text-align:left;
+    animation: slideIn 0.5s ease-out;
+  }
+
+  .circle-note {
+    width: 80%;
+    max-width: 400px;
+    margin: 0.3em auto 0.8em auto;
+    text-align: center;
+  }
+
+  .circle-note1 {
+    font-size: 1.1em;
+  }
+
+  .circle-note2 {
+    font-size: 1.0em;
+    color: gold;
+    margin-top: 0.2em;
+  }
+
+  .credit-box {
+    border: 1px solid #888;
+    width: 80%;
+    max-width: 420px;
+    margin: 1.0em auto 3em auto;
+    padding: 0.8em 1em;
+    border-radius: 4px;
+    color: #fff;
+    font-size: 1.1em;
+    font-family: monospace;
+    text-align: left;
+    background: rgba(255,255,255,0.03);
+  }
+  .credit-title{
+    margin-bottom:0.4em;
+    margin-left:2.4em;
+  }
+  .credit-link{
+    margin-left:3.6em;
+    line-height:1.6;
+  }
+  .credit-support1{
+    margin-top:0.2em;
+    margin-left:2.4em;
+    color:gold;
+    font-weight:bold;
+  }
+  .credit-support2{
+    margin-top:0.2em;
+    margin-left:5.6em;
+    color:gold;
+    font-weight:bold;
+  }
+
+  @keyframes fadeIn {
+    0% { opacity: 0; }
+    100% { opacity: 1; }
+  }
+
+  @keyframes slideIn {
+    0% {
+      transform: translateY(20px);
+      opacity: 0;
+    }
+    100% {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+</style>
 </head>
+
 <body>
-    <div id="main-wrapper">
-        <div id="snap-point"></div>
-        
-        <div id="header-container">
-            <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.01 》</span>
-        </div>
 
-        <div id="timer-display" onclick="handleTap()">03:05</div>
+<h1>≪ 吹矢Timer MENU ver.02 ≫</h1>
+<h2>Design/Development: Ken.Ishida</h2>
 
-        <div id="circle-timer-container">
-            <svg viewBox="0 0 200 200">
-                
+<div class="category-title">★ 競技会向け</div>
 
-                <g id="pie-segments"></g>
-                <path id="mask-path" fill="#000" />
-                <circle class="outline" cx="100" cy="100" r="98" />
-                <g id="mic-button" onclick="toggleMic(event)">
-                    <circle id="mic-circle" cx="100" cy="100" r="28" />
-                    <g id="mic-icon-group">
-                        <path d="M100,81c-3.8,0-7,3.1-7,7v10c0,3.8,3.2,7,7,7s7-3.2,7-7V88C107,84.1,103.8,81,100,81z" stroke-width="0"/>
-                        <path d="M113,99v4c0,7.1-5.8,13-13,13s-13-5.9-13-13v-4h2v4c0,6.1,4.9,11,11,11s11-4.9,11-11v-4H113z" stroke-width="0"/>
-                        <path d="M100,116 v7 M92,123 h16" fill="none" stroke-width="2.5" stroke-linecap="round"/>
-                    </g>
-                </g>
-                            
-<!-- ① beep1(2時の位置) -->
-<text id="note1" class="metro-note" x="190" y="20" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(1)">♬</text>
-<!-- ② beep2(4時の位置) -->
-<text id="note2" class="metro-note" x="190" y="182" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(2)">♫</text>
-<!-- ③ beep3(7時の位置) -->
-<text id="note3" class="metro-note" x="15" y="182" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(3)">♪</text>
-<!-- ④ beep4(10時の位置) -->
-<text id="note4" class="metro-note" x="15" y="20" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(4)">♩</text>
+<div class="version-box" onclick="location.href='official/index.html'">
+  <div class="version-title">
+    &nbsp;Ⅰ．Official Portrait
 
-            </svg>
-        </div>
-    </div>
+  </div>
+</div>
 
-    <script>
-        let timeLeft = 185, timerInterval = null, isRunning = false, wakeLock = null, isMicEnabled = false, recognition = null;
-        const display = document.getElementById('timer-display'), micButton = document.getElementById('mic-button');
-        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+<div class="version-box" onclick="location.href='official/landscape.html'">
+  <div class="version-title">
+    &nbsp;Ⅱ．Official Landscape
+  </div>
+</div>
 
-        document.addEventListener(
-            'touchstart',
-            async () => {
-                // ★ iPhone：最初のユーザー操作でHTML Audioもunlock
-                unlockAudio();
-                if (audioCtx.state !== 'running') {
-                    try {
-                        await audioCtx.resume();
-                    } catch(e){}
-                }
-            },
-            { once:true }
-        );
+<div class="category-title">★ 自主練向け</div>
 
-        // ★ メトロノーム
-        // ★ メトロノーム（4種・排他）
-        let currentMetro = 0;
-        let metroTimer = null;
+<div class="version-box" onclick="location.href='extra/index.html'">
+  <div class="version-title">
+    &nbsp;Ⅲ．Arrows timer
+  </div>
+</div>
 
-        function clearMetro(){
-            [1,2,3,4].forEach(i=>{
-                const el = document.getElementById('note'+i);
-                if(el) el.classList.remove('on-red','on-yellow','on-lime','on-aqua');
-            });
-            if(metroTimer){ clearInterval(metroTimer); metroTimer = null; }
-            currentMetro = 0;
-        }
+<div class="version-box" onclick="location.href='gemini/index.html'">
+  <div class="version-title">
+    &nbsp;Ⅳ．Circle timer
+    <span style="font-size:0.7em; color:#aaa;">
+      （音声認識可）
+    </span>
+  </div>
+</div>
 
-        async function toggleMetro(n){
-            try{
-                if(audioCtx.state !== 'running'){
-                    await audioCtx.resume();
-                }
-            }catch(e){}
-            unlockAudio();
-            if(currentMetro === n){
-                clearMetro();
-                return;
-            }
+<div class="circle-note">
+  <div class="circle-note1">
+    「スタート / 開始 / 始め」を認識
+  </div>
+  <div class="circle-note2">
+    ※ iPhoneでは音声認識未対応です
+  </div>
+</div>
 
-            if(currentMetro === n){
-                clearMetro();
-                return;
-            }
+<!-- ▼ 取扱説明書リンク（テキストのみ） -->
+<div style="margin-top:0.6em;">
+  <a href="manual.pdf"
+     target="_blank"
+     style="color:gold; text-decoration:underline; font-size:1.1em;">
+    ※ 取扱説明書はこちら：26/08/09 UP版
+  </a>
+</div>
 
-            clearMetro();
-            currentMetro = n;
+<!-- Credit -->
+<div class="credit-box">
+  <div class="credit-title">Voiced by</div>
+  <div class="credit-link">https://CoeFont.cloud</div>
+  <div class="credit-link">https://ondoku3.com/ja/</div>
 
-            const el = document.getElementById('note'+n);
-            if(!el) return;
+  <div class="credit-support1">
+    Programming support:
+  </div>
 
-            if(n===1) el.classList.add('on-red');
-            if(n===2) el.classList.add('on-yellow');
-            if(n===3) el.classList.add('on-lime');
-            if(n===4) el.classList.add('on-aqua');
+  <div class="credit-support2">
+    ChatGPT & Gemini
+  </div>
+</div>
 
-            // 初回は即鳴らす
-            if(n===1) beep1();
-            else if(n===2) beep2();
-            else if(n===3) beep3();
-            else if(n===4) beep4();
+<script>
 
-            metroTimer = setInterval(function(){
-                if(n===1) beep1();
-                else if(n===2) beep2();
-                else if(n===3) beep3();
-                else if(n===4) beep4();
-            },1000);
-        }
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./service-worker.js');
 
-        // ① beep音（トライアングル音もどき）
-        function beep1(){
-         const osc = audioCtx.createOscillator();
-         const gainNode = audioCtx.createGain();
-
-         // 1. サイン波または三角波（トライアングルの音に近い）
-         osc.type = 'triangle';
-         // 2. 高い周波数を設定
-         osc.frequency.value = 3000; 
-
-         // 3. エンベロープの設定（急なアタックと減衰）
-         const now = audioCtx.currentTime;
-         gainNode.gain.setValueAtTime(0, now);
-         gainNode.gain.linearRampToValueAtTime(0.4, now + 0.01); // アタック（急）
-         gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8); // 減衰（長め）
-
-         // ノードの接続
-         osc.connect(gainNode);
-         gainNode.connect(audioCtx.destination);
-
-         // 再生と停止
-         osc.start();
-         osc.stop(audioCtx.currentTime + 0.8);
-        }
-
-
-        // ② 指定音（音量調整済）
-        function beep2(){
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = "sine";
-            osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.6);
-        }
-
-        // ③ Real Metronome音（改良版：クリック＋アタック）
-        function beep3(){
-            const now = audioCtx.currentTime;
-
-            // --- 高音クリック（芯） ---
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'square';
-            osc.frequency.setValueAtTime(2000, now);
-            gain.gain.setValueAtTime(0.7, now);
-            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start(now);
-            osc.stop(now + 0.03);
-
-            // --- ノイズクリック（リアル感） ---
-            const bufferSize = audioCtx.sampleRate * 0.02; // 20ms
-            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
-            const data = buffer.getChannelData(0);
-            for (let i = 0; i < bufferSize; i++) {
-                data[i] = (Math.random() * 2 - 1) * 0.5;
-            }
-
-            const noise = audioCtx.createBufferSource();
-            noise.buffer = buffer;
-
-            const noiseGain = audioCtx.createGain();
-            noiseGain.gain.setValueAtTime(0.4, now);
-            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
-
-            noise.connect(noiseGain);
-            noiseGain.connect(audioCtx.destination);
-
-            noise.start(now);
-        }
-
-        // ④ ピーン音 2100Hz
-        function beep4(){
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = "square";
-            osc.frequency.setValueAtTime(2100, audioCtx.currentTime);
-            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
-            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.8);
-        }
-        
-
-        async function playTapSound() {
-            try{
-                if(audioCtx.state !== 'running'){
-                    await audioCtx.resume();
-                }
-            }catch(e){}
-            unlockAudio();
-            const osc = audioCtx.createOscillator();
-            const gain = audioCtx.createGain();
-            osc.type = 'sine';
-            osc.frequency.setValueAtTime(
-                880,
-                audioCtx.currentTime
-            );
-            gain.gain.setValueAtTime(
-                0.1,
-                audioCtx.currentTime
-            );
-            gain.gain.exponentialRampToValueAtTime(
-                0.01,
-                audioCtx.currentTime + 0.1
-            );
-            osc.connect(gain);
-            gain.connect(audioCtx.destination);
-            osc.start();
-            osc.stop(audioCtx.currentTime + 0.1);
-        }
-
-        async function updateWakeLock() {
-            if (!('wakeLock' in navigator)) return;
-            const shouldBeActive = isMicEnabled || isRunning;
-            if (shouldBeActive && wakeLock === null) {
-                try {
-                    wakeLock = await navigator.wakeLock.request('screen');
-                    wakeLock.addEventListener('release', () => { wakeLock = null; });
-                } catch (err) {}
-            } else if (!shouldBeActive && wakeLock !== null) {
-                try {
-                    await wakeLock.release();
-                    wakeLock = null;
-                } catch (err) {}
-            }
-        }
-
-        function updateMicVisual() {
-            if (!isMicEnabled) { micButton.classList.remove('mic-active', 'mic-waiting'); return; }
-            micButton.classList.add('mic-active');
-            if (!isRunning && (timeLeft === 185 || timeLeft === 0)) { micButton.classList.add('mic-waiting'); }
-            else { micButton.classList.remove('mic-waiting'); }
-        }
-
-        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-        if (SpeechRecognition) {
-            recognition = new SpeechRecognition();
-            recognition.lang = 'ja-JP';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-
-            recognition.onresult = (event) => {
-                let transcript = "";
-                for (let i = event.resultIndex; i < event.results.length; i++) {
-                    transcript += event.results[i][0].transcript;
-                }
-                transcript = transcript.toLowerCase().trim();
-                if (!isRunning && (timeLeft === 185 || timeLeft === 0)) {
-                    if (/(開始|かいし|カイシ|スタート|すたーと|start|始め|はじめ|ハジメ)/.test(transcript)) {
-                        if (timeLeft === 0) resetTimer();
-                        startTimer();
-                    }
-                }
-            };
-            recognition.onstart = () => { updateMicVisual(); updateWakeLock(); };
-            recognition.onend = () => { if (isMicEnabled && !isRunning) recognition.start(); updateMicVisual(); updateWakeLock(); };
-            recognition.onerror = () => { if (isMicEnabled) setTimeout(() => recognition.start(), 300); };
-        }
-
-        function toggleMic(event) {
-            event.stopPropagation();
-            playTapSound();
-            if (!recognition) return;
-            if (audioCtx.state === 'suspended') audioCtx.resume();
-            isMicEnabled = !isMicEnabled;
-            if (isMicEnabled) { try { recognition.start(); } catch(e) {} } else { recognition.stop(); }
-            updateMicVisual();
-            updateWakeLock();
-        }
-
-        let audioFiles = null;
-        let audioUnlocked = false;
-
-function unlockAudio(){
-    if(audioUnlocked) return;
-    if(!audioFiles){
-        audioFiles = {
-            start: new Audio('start-0.mp3'),
-            halfMin: new Audio('30sec.mp3'),
-            end: new Audio('end.mp3'),
-            silent: new Audio('silent.mp3')
-        };
+  navigator.serviceWorker.addEventListener('message', event => {
+    if (event.data && event.data.type === 'CACHE_UPDATED') {
+      alert(
+        '吹矢Timer_PWA が更新されました。\n' +
+        '通信が発生しますので、Wi-Fi 環境下で\n' +
+        'しばらく起動したままにしてください。'
+      );
     }
-    [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
-        a.muted = true;
-        a.currentTime = 0;
-        const p = a.play();
-        if(p){
-            p.then(()=>{
-                a.pause();
-                a.currentTime = 0;
-                a.muted = false;
-            }).catch(()=>{
-                a.muted = false;
-            });
-        }else{
-            a.muted = false;
-        }
-    });
-    audioFiles.silent.currentTime = 0;
-    audioFiles.silent.volume = 1;
-    const silentPlay = audioFiles.silent.play();
-    if(silentPlay){
-        silentPlay.catch(()=>{});
-    }
-   audioUnlocked = true;
+  });
 }
 
-        function safePlay(a){
-            try{
-                a.pause();
-                a.currentTime = 0;
-                a.play().catch(()=>{});
-            }catch(e){}
-        }
-        function playChime() { const now = audioCtx.currentTime; const p = (f, s, d) => { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(f, s); g.gain.setValueAtTime(0.5, s); g.gain.exponentialRampToValueAtTime(0.01, s + d); o.connect(g); g.connect(audioCtx.destination); o.start(s); o.stop(s + d); }; p(659.25, now, 0.8); p(523.25, now + 0.4, 1.2); }
-        
-        function updateDisplay() {
-            let m = Math.floor(timeLeft / 60), s = timeLeft % 60;
-            display.innerText = m + ":" + s.toString().padStart(2, '0');
-            display.classList.remove('blink', 'blink-fast');
-            const pieSegments = document.getElementById('pie-segments');
-            const maskPath = document.getElementById('mask-path');
-
-            if (timeLeft > 180 || timeLeft === 0) {
-                display.style.color = "lime";
-                if (timeLeft === 0) display.classList.add('blink-fast');
-                maskPath.setAttribute("d", ""); 
-                pieSegments.classList.add('wave-active');
-            } else {
-                display.style.color = (timeLeft > 30) ? "gold" : "red";
-                if (timeLeft <= 30) display.classList.add('blink');
-                pieSegments.classList.remove('wave-active');
-
-                const startAngle = -90;
-                const angle = ((180 - Math.max(0, timeLeft)) / 180) * 360;
-                maskPath.setAttribute("d", angle <= 0 ? "" : getPathData(startAngle, startAngle + Math.min(angle, 359.9)));
-            }
-            
-            if ([141, 107, 73, 39].includes(timeLeft)) playChime();
-            if (timeLeft === 181 && audioFiles) safePlay(audioFiles.start);
-            if (timeLeft === 30 && audioFiles) safePlay(audioFiles.halfMin);
-            if (timeLeft === 0) {
-                if (audioFiles) safePlay(audioFiles.end);
-                clearInterval(timerInterval); isRunning = false;
-                updateWakeLock(); 
-                if (isMicEnabled) setTimeout(() => { if (!isRunning && isMicEnabled) { try { recognition.start(); } catch(e){} updateMicVisual(); } }, 2000);
-                updateMicVisual();
-            }
-        }
-
-        function getPathData(s, e) {
-            const r = Math.PI / 180;
-            return "M 100 100 L "
-              + (100 + 98 * Math.cos(s * r)) + " "
-              + (100 + 98 * Math.sin(s * r))
-              + " A 98 98 0 "
-              + (e - s <= 180 ? 0 : 1) + " 1 "
-              + (100 + 98 * Math.cos(e * r)) + " "
-              + (100 + 98 * Math.sin(e * r)) + " Z";
-        }
-
-        function initPie() { 
-            const pie = document.getElementById('pie-segments'); pie.innerHTML = ''; let ang = -90;
-            [{sec:39,c:'lime'},{sec:34,c:'purple'},{sec:34,c:'Blue'},{sec:34,c:'yellow'},{sec:39,c:'red'}].forEach(a => {
-                const d = (a.sec/180)*360; const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
-                p.setAttribute("d", getPathData(ang, ang + d)); p.setAttribute("fill", a.c); pie.appendChild(p); ang += d;
-            });
-        }
-
-        function handleTap() { 
-            unlockAudio();
-            playTapSound();
-            if (isRunning || timeLeft === 0) resetTimer(); else startTimer(); 
-        }
-
-        async function startTimer() { 
-            if (isRunning) return; 
-
-            // ★ 音声起動時も確実にAudio解放
-            unlockAudio();
-            if (audioCtx.state === 'suspended') {
-                try { await audioCtx.resume(); } catch(e){}
-            }
-
-            isRunning = true; 
-            if (isMicEnabled) { try { recognition.stop(); } catch(e){} } 
-            updateWakeLock(); 
-            timerInterval = setInterval(() => { 
-                if (timeLeft > 0) { 
-                    timeLeft--; 
-                    updateDisplay(); 
-                } 
-            }, 1000); 
-            updateMicVisual(); 
-        }
-
-        function resetTimer() { 
-            clearInterval(timerInterval); isRunning = false; timeLeft = 185; 
-            if (isMicEnabled) { try { recognition.start(); } catch(e){} } 
-            initPie(); 
-            updateDisplay();
-            updateMicVisual(); 
-            updateWakeLock(); 
-        }
-
-        initPie(); 
-        updateDisplay();
-    
-    /* === 虹色リニアモーターカー（2秒/周・出入庫完全対称版） === */
-(function(){
-  const svg = document.querySelector("#circle-timer-container svg");
-  if(!svg) return;
-
-  const NS = "http://www.w3.org/2000/svg";
-  const cx = 100, cy = 100;
-
-  const old = svg.querySelector("#linear-train");
-  if(old) old.remove();
-
-  const outline = svg.querySelector(".outline");
-  const tubeWidth = 6;
-  const tubeRadius = 98 - tubeWidth/2;
-  outline.setAttribute("r", tubeRadius);
-  outline.style.strokeWidth = tubeWidth;
-
-  const R = tubeRadius;
-  const totalDeg = 60;
-  const cars = 7;
-  const carDeg = totalDeg / cars;
-
-  const baseColors = [
-    "#ff0000","#ff7f00","#ffff00",
-    "#00ff00","#00aaff","#0000ff","#8b00ff"
-  ];
-
-/* === 虹色リニアモーターカー  周回速度 === */
-/* === const degPerSec = 20;  //18秒/周 === */
-/* === const degPerSec = 60;  // 6秒/周 === */
-/* === const degPerSec = 180; // 2秒/周 === */
-  const degPerSec = 180; // 2秒/周
-
-  let animId = null;
-  let trainStartTime = null;
-  let stopStartTime = null;
-  let stopping = false;
-  let colorShift = 0;
-  let elapsedAtStop = 0; // 入庫開始時の経過秒
-
-  const group = document.createElementNS(NS,"g");
-  group.setAttribute("id","linear-train");
-  group.style.display = "none";
-  svg.appendChild(group);
-
-  function polar(angle){
-    const rad = (angle-90)*Math.PI/180;
-    return {
-      x: cx + R*Math.cos(rad),
-      y: cy + R*Math.sin(rad)
-    };
-  }
-
-  function draw(now){
-    group.innerHTML = "";
-    if(!trainStartTime) return;
-
-    const elapsed = (now - trainStartTime)/1000;
-    let totalElapsed = elapsed;
-    if(stopping){
-      const stopElapsed = (now - stopStartTime)/1000;
-      totalElapsed = elapsedAtStop + stopElapsed; // 出庫の続きとして回転
-    }
-    const rotation = 0 + totalElapsed * degPerSec;
-    const passedDeg = totalElapsed * degPerSec;
-
-    const laps = Math.floor(passedDeg / 360);
-    colorShift = laps % cars;
-
-    let visibleCars;
-
-    let headShift = 0; // 先頭を何両分進めるか
-
-    // 出庫：開始からの進行角で増加（最大7両）
-    if(!stopping){
-      const carsOut = Math.floor(passedDeg / carDeg) + 1;
-      visibleCars = Math.min(cars, carsOut);
-    }
-    // 入庫：12時通過ごとに「先頭車両を消す」＝先頭を前に送る
-    else{
-      const stopElapsed = (now - stopStartTime)/1000;
-      const stopDeg = stopElapsed * degPerSec;
-      const carsIn = Math.floor(stopDeg / carDeg) + 1;
-      const hidden = Math.min(cars, carsIn);
-
-      headShift = hidden;              // 先頭をhidden両分進める
-      visibleCars = Math.max(0, cars - hidden);
-    }
-
-    for(let i=0;i<visibleCars;i++){
-      const logicalIndex = i + (typeof headShift !== 'undefined' ? headShift : 0);
-      const offset = logicalIndex * carDeg;
-      const start = rotation - offset;
-      const end   = start - carDeg;
-
-      const p1 = polar(start);
-      const p2 = polar(end);
-
-      const path = document.createElementNS(NS,"path");
-      path.setAttribute("d",
-        `M ${p1.x} ${p1.y} A ${R} ${R} 0 0 0 ${p2.x} ${p2.y}`
-      );
-      path.setAttribute("fill","none");
-      path.setAttribute("stroke-width", tubeWidth);
-      path.setAttribute("stroke-linecap","butt");
-      path.setAttribute("stroke", baseColors[(logicalIndex + colorShift) % cars]);
-
-      group.appendChild(path);
-    }
-
-    if(stopping && visibleCars === 0){
-      cancelAnimationFrame(animId);
-      animId = null;
-      group.style.display = "none";
-      stopping = false;
-    }
-  }
-
-  function animate(now){
-    draw(now);
-    animId = requestAnimationFrame(animate);
-  }
-
-  const origStart = window.startTimer;
-  const origReset = window.resetTimer;
-  const origUpdateDisplay = window.updateDisplay;
-
-  window.startTimer = function(){
-    trainStartTime = null;
-    stopStartTime = null;
-    stopping = false;
-    group.style.display = "none";
-    if(origStart) origStart.apply(this,arguments);
-  }
-
-  window.updateDisplay = function(){
-    if(origUpdateDisplay) origUpdateDisplay.apply(this,arguments);
-
-    // 3:00 出庫開始
-    if(timeLeft === 180 && !trainStartTime){
-      trainStartTime = performance.now();
-      group.style.display = "block";
-      if(!animId) animId = requestAnimationFrame(animate);
-    }
-
-    // 0:00 入庫開始（即消さない）
-    if(timeLeft === 0 && trainStartTime && !stopping){
-      stopStartTime = performance.now();
-      elapsedAtStop = (stopStartTime - trainStartTime)/1000;
-      stopping = true;
-    }
-  }
-
-  window.resetTimer = function(){
-    cancelAnimationFrame(animId);
-    animId = null;
-    trainStartTime = null;
-    stopStartTime = null;
-    stopping = false;
-    group.style.display = "none";
-    if(origReset) origReset.apply(this,arguments);
-  }
-})();
-
 /* === Keyboard対応 === */
-document.addEventListener('keydown', function(e){
+document.addEventListener('keydown', function(event) {
 
-    // Spaceキーのページスクロール防止
-    if(e.code === 'Space'){
-        e.preventDefault();
-    }
+  // Spaceキーでページスクロール防止
+  if (event.code === 'Space') {
+    event.preventDefault();
+  }
 
-    // START / RESET
-    if(e.code === 'Space' || e.code === 'Enter'){
-        handleTap();
-    }
+  switch(event.key.toLowerCase()) {
 
-    // Mic ON/OFF
-    else if(e.key === 'm' || e.key === 'M'){
-        toggleMic({ stopPropagation: ()=>{} });
-    }
+    // 1-key：Official Portrait Edition
+    case '1':
+      location.href = 'official/index.html';
+      break;
 
-    // メトロノーム ON/OFF
-    else if(e.key === '1'){
-        toggleMetro(1);
-    }
-    else if(e.key === '2'){
-        toggleMetro(2);
-    }
-    else if(e.key === '3'){
-        toggleMetro(3);
-    }
-    else if(e.key === '4'){
-        toggleMetro(4);
-    }
+    // 2-key：Official Landscape Edition
+    case '2':
+      location.href = 'official/landscape.html';
+      break;
 
-    // メトロノーム停止
-    else if(e.key === '0'){
-        clearMetro();
-    }
+    // 3-key：Arrows Timer
+    case '3':
+      location.href = 'extra/index.html';
+      break;
+
+    // 4-key：Circle Timer
+    case '4':
+      location.href = 'gemini/index.html';
+      break;
+
+    // M-key：manual.pdf
+    case 'm':
+      window.open('manual.pdf', '_blank');
+      break;
+  }
 });
-
 </script>
+
 </body>
 </html>
