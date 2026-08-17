@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.02 》</span>
+            <span id="title-sub">《 by Ken.Ishida.03 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -410,10 +410,20 @@
 
 function unlockAudio(){
     if(audioUnlocked) return;
-    // ===== Web Audio APIを同時にunlock =====
-    if(audioCtx.state !== 'running'){
-        audioCtx.resume().catch(()=>{});
-    }
+    // ===== Web Audio APIをユーザー操作中に実際に起動 =====
+    try{
+        const unlockOsc = audioCtx.createOscillator();
+        const unlockGain = audioCtx.createGain();
+        unlockGain.gain.setValueAtTime(0, audioCtx.currentTime);
+        unlockOsc.connect(unlockGain);
+        unlockGain.connect(audioCtx.destination);
+        unlockOsc.start();
+        unlockOsc.stop(audioCtx.currentTime + 0.05);
+        if(audioCtx.state !== 'running'){
+            audioCtx.resume().catch(()=>{});
+        }
+    }catch(e){}
+    // ===== HTML Audio =====
     if(!audioFiles){
         audioFiles = {
             start: new Audio('start-0.mp3'),
@@ -422,7 +432,6 @@ function unlockAudio(){
             silent: new Audio('silent.mp3')
         };
     }
-    // ===== HTML Audioをunlock =====
     [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
         a.muted = true;
         a.currentTime = 0;
@@ -439,7 +448,7 @@ function unlockAudio(){
             a.muted = false;
         }
     });
-    // ===== silent.mp3を実音で再生 =====
+    // ===== silent.mp3 =====
     audioFiles.silent.currentTime = 0;
     audioFiles.silent.volume = 1;
     const silentPlay = audioFiles.silent.play();
