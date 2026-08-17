@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.01 》</span>
+            <span id="title-sub">《 by Ken.Ishida.02 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -410,6 +410,10 @@
 
 function unlockAudio(){
     if(audioUnlocked) return;
+    // ===== Web Audio APIを同時にunlock =====
+    if(audioCtx.state !== 'running'){
+        audioCtx.resume().catch(()=>{});
+    }
     if(!audioFiles){
         audioFiles = {
             start: new Audio('start-0.mp3'),
@@ -418,6 +422,7 @@ function unlockAudio(){
             silent: new Audio('silent.mp3')
         };
     }
+    // ===== HTML Audioをunlock =====
     [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
         a.muted = true;
         a.currentTime = 0;
@@ -434,13 +439,14 @@ function unlockAudio(){
             a.muted = false;
         }
     });
+    // ===== silent.mp3を実音で再生 =====
     audioFiles.silent.currentTime = 0;
     audioFiles.silent.volume = 1;
     const silentPlay = audioFiles.silent.play();
     if(silentPlay){
         silentPlay.catch(()=>{});
     }
-   audioUnlocked = true;
+    audioUnlocked = true;
 }
 
         function safePlay(a){
