@@ -117,7 +117,7 @@
         
         <div id="header-container">
             <span id="title-main">Circle timer - ver.03a</span><br>
-            <span id="title-sub">《 by Ken.Ishida.03 》</span>
+            <span id="title-sub">《 by Ken.Ishida.04 》</span>
         </div>
 
         <div id="timer-display" onclick="handleTap()">03:05</div>
@@ -184,47 +184,37 @@
             currentMetro = 0;
         }
 
-        async function toggleMetro(n){
-            try{
-                if(audioCtx.state !== 'running'){
-                    await audioCtx.resume();
-                }
-            }catch(e){}
-            unlockAudio();
-            if(currentMetro === n){
-                clearMetro();
-                return;
-            }
-
-            if(currentMetro === n){
-                clearMetro();
-                return;
-            }
-
-            clearMetro();
-            currentMetro = n;
-
-            const el = document.getElementById('note'+n);
-            if(!el) return;
-
-            if(n===1) el.classList.add('on-red');
-            if(n===2) el.classList.add('on-yellow');
-            if(n===3) el.classList.add('on-lime');
-            if(n===4) el.classList.add('on-aqua');
-
-            // 初回は即鳴らす
-            if(n===1) beep1();
-            else if(n===2) beep2();
-            else if(n===3) beep3();
-            else if(n===4) beep4();
-
-            metroTimer = setInterval(function(){
-                if(n===1) beep1();
-                else if(n===2) beep2();
-                else if(n===3) beep3();
-                else if(n===4) beep4();
-            },1000);
-        }
+function toggleMetro(n){
+    // iPhoneではawaitでユーザー操作の同期処理を
+    // 中断しないことが重要。
+    if(audioCtx.state !== 'running'){
+        audioCtx.resume().catch(()=>{});
+    }
+    unlockAudio();
+    if(currentMetro === n){
+        clearMetro();
+        return;
+    }
+    clearMetro();
+    currentMetro = n;
+    const el = document.getElementById('note'+n);
+    if(!el) return;
+    if(n===1) el.classList.add('on-red');
+    if(n===2) el.classList.add('on-yellow');
+    if(n===3) el.classList.add('on-lime');
+    if(n===4) el.classList.add('on-aqua');
+    // 初回音をユーザー操作の同期処理内で実行
+    if(n===1) beep1();
+    else if(n===2) beep2();
+    else if(n===3) beep3();
+    else if(n===4) beep4();
+    metroTimer = setInterval(function(){
+        if(n===1) beep1();
+        else if(n===2) beep2();
+        else if(n===3) beep3();
+        else if(n===4) beep4();
+    },1000);
+}
 
         // ① beep音（トライアングル音もどき）
         function beep1(){
