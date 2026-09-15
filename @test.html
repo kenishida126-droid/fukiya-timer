@@ -216,8 +216,8 @@
   }
 
   @keyframes musicTitleScroll {
-    from { transform: translateX(var(--music-title-start)); }
-    to   { transform: translateX(var(--music-title-end)); }
+    from { left: var(--music-title-start); }
+    to   { left: var(--music-title-end); }
   }
 
 
@@ -745,34 +745,34 @@ function showMusicLongTapHint() {
 function showMusicTitle(title, allowScroll = true) {
   const displayTitle = title || `Music-${currentMusic}`;
 
-  // タイトル表示窓を音楽ボタンと同じ幅にする
+  // 音楽ボタンと同じ幅をタイトル表示窓にする
   const buttonWidth = musicButton.getBoundingClientRect().width;
   if (buttonWidth > 0) {
     musicHint.style.width = `${buttonWidth}px`;
   }
 
-  musicHint.innerHTML = '';
+  musicHint.innerHTML = "";
 
-  const span = document.createElement('span');
-  span.className = 'musicTitleText';
+  const span = document.createElement("span");
+  span.className = "musicTitleText";
   span.textContent = `♪${displayTitle}♫`;
   musicHint.appendChild(span);
 
-  // 表示窓とタイトルの実幅を比較して判定
+  // 表示窓とタイトルの実幅を比較
   const hintWidth = musicHint.clientWidth;
   const titleWidth = span.scrollWidth;
 
   if (allowScroll && titleWidth > hintWidth) {
-    // 表示窓の右端から入り、タイトル全体が左へ抜ける
-    span.style.setProperty('--music-title-start', `${hintWidth}px`);
-    span.style.setProperty('--music-title-end', `${-titleWidth}px`);
-    span.classList.add('scroll');
+    // タイトル全体を表示窓の右端から左端まで移動させる
+    span.style.setProperty("--music-title-start", `${hintWidth}px`);
+    span.style.setProperty("--music-title-end", `${-titleWidth}px`);
+    span.classList.add("scroll");
   } else {
-    // 収まるタイトルは中央固定
-    span.classList.add('fit');
+    // 短いタイトルは表示窓の中央に固定
+    span.classList.add("fit");
   }
 
-  musicHint.style.visibility = 'visible';
+  musicHint.style.visibility = "visible";
 }
 
 function syncMusicHintWidth() {
