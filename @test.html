@@ -190,17 +190,28 @@
      ======================================== */
 
   .musicTitleText {
-    display: inline-block;
-    white-space: nowrap;
-    color: gold;
-  }
+  display:block;
+  white-space:nowrap;
+  color:gold;
+}
 
-  .musicTitleText.scroll {
-    animation: musicTitleScroll 10s linear infinite;
-  }
+.musicTitleText.fit {
+  width:100%;
+  text-align:center;
+}
 
-  @keyframes musicTitleScroll {
-    from { transform: translateX(100%); }
+.musicTitleText.scroll {
+  position:absolute;
+  top:0;
+  left:0;
+  width:max-content;
+  animation:musicTitleScroll 10s linear infinite;
+}
+
+@keyframes musicTitleScroll {
+  from { transform:translateX(var(--music-title-start)); }
+  to   { transform:translateX(var(--music-title-end)); }
+}
     to   { transform: translateX(-100%); }
   }
 
@@ -401,7 +412,7 @@
   <div id="musicControl">
 
     <div id="musicHint">
-      選曲はLong-tap
+      選曲はLong-tap/左右フリック
     </div>
 
 
@@ -595,6 +606,9 @@ function findBytes(haystack, needle) {
     if (found) return i;
   }
   return -1;
+  overflow:hidden;
+  position:relative;
+  text-align:center;
 }
 
 function getMusicTitleFromBuffer(buffer) {
@@ -723,25 +737,42 @@ async function fetchMusicTitle(number) {
 }
 
 function showMusicLongTapHint() {
-  musicHint.innerHTML = '選曲はLong-tap';
+  musicHint.innerHTML = '選曲はLong-tap/左右フリック';
 }
 
 function showMusicTitle(title, allowScroll = true) {
-  const displayTitle = title || `Music-${currentMusic}`;
-  musicHint.innerHTML = '';
+  if (!title) {
+    showMusicLongTapHint();
+    return;
+  }
 
-  const span = document.createElement('span');
-  span.className = 'musicTitleText';
-  span.textContent = `♪${displayTitle}♫`;
+  const buttonWidth = musicButton.getBoundingClientRect().width;
+  if (buttonWidth > 0) musicHint.style.width = `${buttonWidth}px`;
+
+  musicHint.innerHTML = "";
+
+  const span = document.createElement("span");
+  span.className = "musicTitleText";
+  span.textContent = `♪${title}♫`;
   musicHint.appendChild(span);
 
-  if (allowScroll) {
-    requestAnimationFrame(function() {
-      if (span.scrollWidth > musicHint.clientWidth) {
-        span.classList.add('scroll');
-      }
-    });
+  const hintWidth = musicHint.clientWidth;
+  const titleWidth = span.scrollWidth;
+
+  if (allowScroll && titleWidth > hintWidth) {
+    span.style.setProperty("--music-title-start", `${hintWidth}px`);
+    span.style.setProperty("--music-title-end", `${-titleWidth}px`);
+    span.classList.add("scroll");
+  } else {
+    span.classList.add("fit");
   }
+
+  musicHint.style.visibility = "visible";
+}
+
+function syncMusicHintWidth() {
+  const buttonWidth = musicButton.getBoundingClientRect().width;
+  if (buttonWidth > 0) musicHint.style.width = `${buttonWidth}px`;
 }
 
 function updateMusicTitleByTime() {
@@ -2168,6 +2199,9 @@ document
   );
 
 
+window.addEventListener("resize", syncMusicHintWidth);
+window.addEventListener("orientationchange", syncMusicHintWidth);
+syncMusicHintWidth();
 </script>
 
 </body>
