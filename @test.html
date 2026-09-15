@@ -183,6 +183,13 @@
     text-shadow:
       2px 2px 5px #000,
       -1px -1px 3px #000;
+
+    /*
+       タイトルはこの表示窓の中だけで動かす。
+    */
+    overflow: hidden;
+    position: relative;
+    text-align: center;
   }
 
   /* ========================================
@@ -190,29 +197,27 @@
      ======================================== */
 
   .musicTitleText {
-  display:block;
-  white-space:nowrap;
-  color:gold;
-}
+    display: block;
+    white-space: nowrap;
+    color: gold;
+  }
 
-.musicTitleText.fit {
-  width:100%;
-  text-align:center;
-}
+  .musicTitleText.fit {
+    width: 100%;
+    text-align: center;
+  }
 
-.musicTitleText.scroll {
-  position:absolute;
-  top:0;
-  left:0;
-  width:max-content;
-  animation:musicTitleScroll 10s linear infinite;
-}
+  .musicTitleText.scroll {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: max-content;
+    animation: musicTitleScroll 10s linear infinite;
+  }
 
-@keyframes musicTitleScroll {
-  from { transform:translateX(var(--music-title-start)); }
-  to   { transform:translateX(var(--music-title-end)); }
-}
-    to   { transform: translateX(-100%); }
+  @keyframes musicTitleScroll {
+    from { transform: translateX(var(--music-title-start)); }
+    to   { transform: translateX(var(--music-title-end)); }
   }
 
 
@@ -606,9 +611,6 @@ function findBytes(haystack, needle) {
     if (found) return i;
   }
   return -1;
-  overflow:hidden;
-  position:relative;
-  text-align:center;
 }
 
 function getMusicTitleFromBuffer(buffer) {
@@ -741,38 +743,43 @@ function showMusicLongTapHint() {
 }
 
 function showMusicTitle(title, allowScroll = true) {
-  if (!title) {
-    showMusicLongTapHint();
-    return;
+  const displayTitle = title || `Music-${currentMusic}`;
+
+  // タイトル表示窓を音楽ボタンと同じ幅にする
+  const buttonWidth = musicButton.getBoundingClientRect().width;
+  if (buttonWidth > 0) {
+    musicHint.style.width = `${buttonWidth}px`;
   }
 
-  const buttonWidth = musicButton.getBoundingClientRect().width;
-  if (buttonWidth > 0) musicHint.style.width = `${buttonWidth}px`;
+  musicHint.innerHTML = '';
 
-  musicHint.innerHTML = "";
-
-  const span = document.createElement("span");
-  span.className = "musicTitleText";
-  span.textContent = `♪${title}♫`;
+  const span = document.createElement('span');
+  span.className = 'musicTitleText';
+  span.textContent = `♪${displayTitle}♫`;
   musicHint.appendChild(span);
 
+  // 表示窓とタイトルの実幅を比較して判定
   const hintWidth = musicHint.clientWidth;
   const titleWidth = span.scrollWidth;
 
   if (allowScroll && titleWidth > hintWidth) {
-    span.style.setProperty("--music-title-start", `${hintWidth}px`);
-    span.style.setProperty("--music-title-end", `${-titleWidth}px`);
-    span.classList.add("scroll");
+    // 表示窓の右端から入り、タイトル全体が左へ抜ける
+    span.style.setProperty('--music-title-start', `${hintWidth}px`);
+    span.style.setProperty('--music-title-end', `${-titleWidth}px`);
+    span.classList.add('scroll');
   } else {
-    span.classList.add("fit");
+    // 収まるタイトルは中央固定
+    span.classList.add('fit');
   }
 
-  musicHint.style.visibility = "visible";
+  musicHint.style.visibility = 'visible';
 }
 
 function syncMusicHintWidth() {
   const buttonWidth = musicButton.getBoundingClientRect().width;
-  if (buttonWidth > 0) musicHint.style.width = `${buttonWidth}px`;
+  if (buttonWidth > 0) {
+    musicHint.style.width = `${buttonWidth}px`;
+  }
 }
 
 function updateMusicTitleByTime() {
@@ -2199,9 +2206,10 @@ document
   );
 
 
-window.addEventListener("resize", syncMusicHintWidth);
-window.addEventListener("orientationchange", syncMusicHintWidth);
+window.addEventListener('resize', syncMusicHintWidth);
+window.addEventListener('orientationchange', syncMusicHintWidth);
 syncMusicHintWidth();
+
 </script>
 
 </body>

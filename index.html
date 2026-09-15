@@ -28,6 +28,27 @@
     animation: fadeIn 1s ease-out;
   }
 
+  /* ===== PWA キャッシュ状態ドット ===== */
+  #cacheStatus {
+    display: none;
+    position: fixed;
+    top: 8px;
+    right: 10px;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: lime;
+  }
+
+  #cacheStatus.updating {
+    background: red;
+    animation: cacheBlink 0.7s infinite;
+  }
+
+  @keyframes cacheBlink {
+    50% { opacity: 0; }
+  }
+
   h1 {
     font-size: 1.4em;
     color: gold;
@@ -124,6 +145,7 @@
     font-weight:bold;
   }
 
+
   @keyframes fadeIn {
     0% { opacity: 0; }
     100% { opacity: 1; }
@@ -144,7 +166,9 @@
 
 <body>
 
-<h1>≪ 吹矢Timer MENU ver.03 ≫</h1>
+<div id="cacheStatus"></div>
+
+<h1>≪ 吹矢Timer MENU ver.04 ≫</h1>
 <h2>Design/Development: Ken.Ishida</h2>
 
 <div class="category-title">★ 競技会向け</div>
@@ -231,18 +255,65 @@
 
 <script>
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('./service-worker.js');
+/* =========================================================
+   PWA / Web 判定・CACHE状態表示
+   =========================================================
+   service-worker.js の存在を実際に登録できるかで判定する。
+   一般Web版には service-worker.js がないため、
+   iPhoneで「ホーム画面に追加」してもCACHEマークは表示しない。
+*/
+const cacheStatus = document.getElementById('cacheStatus');
+let cacheUpdating = false;
 
+if ('serviceWorker' in navigator) {
+
+  /* メッセージ受信を先に設定して、CACHE_STARTを取りこぼさない */
   navigator.serviceWorker.addEventListener('message', event => {
-    if (event.data && event.data.type === 'CACHE_UPDATED') {
+    if (!event.data || !cacheStatus) return;
+
+    if (event.data.type === 'CACHE_START') {
+      cacheUpdating = true;
+      cacheStatus.style.display = 'block';
+      cacheStatus.style.background = 'red';
+      cacheStatus.classList.add('updating');
+      return;
+    }
+
+    if (event.data.type === 'CACHE_STATUS') {
+      /* 更新中は、旧Service Workerからの状態通知で緑に戻さない */
+      if (cacheUpdating) return;
+
+      cacheStatus.style.display = 'block';
+      cacheStatus.classList.remove('updating');
+      cacheStatus.style.background = 'lime';
+      return;
+    }
+
+    if (event.data.type === 'CACHE_UPDATED') {
+      cacheUpdating = false;
+      cacheStatus.style.display = 'block';
+      cacheStatus.classList.remove('updating');
+      cacheStatus.style.background = 'lime';
+
       alert(
-        '吹矢Timer_PWA が更新されました。\n' +
-        '通信が発生しますので、Wi-Fi 環境下で\n' +
-        'しばらく起動したままにしてください。'
+        '吹矢Timer_PWA が更新されました\n' +
+        '****　CACHE_UPDATED　****'
       );
     }
   });
+
+  /* PWA版なら登録成功、一般Web版なら404等で失敗する */
+  navigator.serviceWorker.register('./service-worker.js')
+    .then(registration => {
+      /* 現在のCACHE_NAMEを確認して、変更がなければ緑点灯 */
+      const worker = registration.active || navigator.serviceWorker.controller;
+      if (worker) {
+        worker.postMessage({ type: 'GET_CACHE_STATUS' });
+      }
+    })
+    .catch(() => {
+      /* 一般Web版：何もしない */
+    });
 }
 
 /* === Keyboard対応 === */
