@@ -470,7 +470,7 @@
        ======================================== -->
 
   <button class="button" id="backButton">
-    戻る《ver.27》
+    戻る《ver.28》
   </button>
 
 
@@ -1903,6 +1903,17 @@ async function initializeMusic() {
   }
 
   showInitialButton();
+
+  /* ========================================
+     初回再生の遅延対策
+
+     前回曲（またはMusic-1）を起動直後から
+     音声要素へセットして先行ロードする。
+     MP3存在確認の完了は待たない。
+     ======================================== */
+  music.preload = 'auto';
+  music.src = getMusicFile(currentMusic);
+  music.load();
 
 })();
 
