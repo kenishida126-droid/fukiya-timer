@@ -470,7 +470,7 @@
        ======================================== -->
 
   <button class="button" id="backButton">
-    戻る
+    戻る《ver.27》
   </button>
 
 
@@ -742,6 +742,9 @@ function showMusicLongTapHint() {
   musicHint.innerHTML = '選曲はLong-tap/左右フリック';
 }
 
+/* 同じ曲のtimeupdateでタイトル表示を作り直さないための管理値 */
+let musicTitleShownFor = 0;
+
 function showMusicTitle(title, allowScroll = true) {
   const displayTitle = title || `Music-${currentMusic}`;
 
@@ -783,16 +786,27 @@ function syncMusicHintWidth() {
 }
 
 function updateMusicTitleByTime() {
-  if (musicMode === 'none' || music.paused || !music.src) return;
+  if (musicMode === 'none' || !music.src) return;
 
   if (music.currentTime < musicTitleDisplayDelay) {
-    showMusicLongTapHint();
+    if (!music.paused) {
+      showMusicLongTapHint();
+    }
     return;
   }
 
+  /*
+     timeupdateは再生中に何度も発生する。
+     毎回showMusicTitle()を呼ぶとスクロール位置が
+     先頭へリセットされるため、同じ曲では一度だけ表示する。
+  */
+  if (musicTitleShownFor === currentMusic) return;
+
   const title = musicTitleCache.get(currentMusic);
   showMusicTitle(title || '');
+  musicTitleShownFor = currentMusic;
 }
+
 
 function prepareMusicTitle(number, requestId) {
   fetchMusicTitle(number).then(function(title) {
@@ -800,7 +814,10 @@ function prepareMusicTitle(number, requestId) {
     if (currentMusic !== number || musicMode === 'none') return;
 
     if (!music.paused && music.currentTime >= musicTitleDisplayDelay) {
-      showMusicTitle(title || '');
+      if (musicTitleShownFor !== number) {
+        showMusicTitle(title || '');
+        musicTitleShownFor = number;
+      }
     }
   });
 }
@@ -1334,6 +1351,7 @@ async function playMusic(number) {
   }
 
   currentMusic = number;
+  musicTitleShownFor = 0;
   saveCurrentMusic();
 
   music.src =
@@ -1969,8 +1987,8 @@ function changeWallpaper() {
 
 initializeWallpaper();
 
-/* 15秒ごと（テスト用）単位は、ms */
-setInterval(changeWallpaper, 15000);
+/* 5秒ごと（テスト用） */
+setInterval(changeWallpaper, 5000);
 
 
 /* ========================================
