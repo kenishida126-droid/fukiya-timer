@@ -284,7 +284,12 @@
     width: 80%;
     max-width: 360px;
 
-    /* 11曲でもページ全体をスクロールさせない */
+    /*
+       画面下端のナビゲーションバーに隠れないよう、
+       JavaScriptで「メニュー上端～表示可能な画面下端」
+       の高さを設定する。
+       max-heightは安全側の上限として残す。
+    */
     max-height: 50vh;
     overflow-y: auto;
     overflow-x: hidden;
@@ -504,7 +509,7 @@
        ======================================== -->
 
   <button class="button" id="backButton">
-    戻　る《ver.33》
+    戻　る
   </button>
 
 
@@ -1900,8 +1905,37 @@ function showMusicMenu() {
 
   updateMusicMenuHighlight();
 
+  /*
+     先に表示してメニュー上端を取得する。
+     機種によって異なる画面高さ／ナビゲーション領域に
+     合わせて、表示可能な高さだけを確保する。
+     これによりF-51Bでも最下段のMusic-20まで
+     スクロールして表示できる。
+  */
   musicMenu.style.display =
     'block';
+
+  const menuRect =
+    musicMenu.getBoundingClientRect();
+
+  const viewportHeight =
+    window.visualViewport
+      ? window.visualViewport.height
+      : window.innerHeight;
+
+  const bottomMargin = 8;
+
+  const availableHeight =
+    Math.floor(
+      viewportHeight -
+      menuRect.top -
+      bottomMargin
+    );
+
+  if (availableHeight > 0) {
+    musicMenu.style.maxHeight =
+      `${availableHeight}px`;
+  }
 
 }
 
@@ -2300,7 +2334,7 @@ function changeWallpaper() {
 
 initializeWallpaper();
 
-/* 5秒ごと（テスト用） */
+/* 壁紙切替え間隔 単位:ms 15000=15秒 */
 setInterval(changeWallpaper, 15000);
 
 
