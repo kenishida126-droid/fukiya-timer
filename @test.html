@@ -272,6 +272,110 @@
 
 
   /* ========================================
+     Ver.10 音楽再生元選択
+     GitHub / Local / External
+     ======================================== */
+  #musicSourceSelector {
+    width: 80%;
+    max-width: 360px;
+    margin: 0.25em auto 0.9em auto;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 1.1em;
+    font-size: 1.05em;
+    font-weight: bold;
+    color: #fff;
+    text-shadow: 2px 2px 4px #000;
+  }
+
+  #musicSourceSelector label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25em;
+    cursor: pointer;
+    white-space: nowrap;
+    -webkit-user-select: none;
+    user-select: none;
+    touch-action: manipulation;
+  }
+
+  #musicSourceSelector input {
+    accent-color: lime;
+  }
+
+  #musicSourceHint {
+    width: 90%;
+    max-width: 360px;
+    margin: -0.55em auto 0.7em auto;
+    text-align: center;
+    font-size: 0.78em;
+    color: #fff;
+    text-shadow: 1px 1px 3px #000;
+    white-space: nowrap;
+  }
+
+  /* ========================================
+     Ver.10 フォルダー選択案内
+     ======================================== */
+  #folderPickerDialog {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 3000;
+    background: rgba(0,0,0,0.82);
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+  }
+
+  #folderPickerPanel {
+    width: 92%;
+    max-width: 430px;
+    padding: 1.4em 1em 1.2em 1em;
+    border: 1px solid rgba(255,255,255,0.8);
+    border-radius: 12px;
+    background: rgba(20,20,20,0.96);
+    box-shadow: 0 0 20px rgba(0,0,0,0.9);
+    text-align: center;
+  }
+
+  #folderPickerMessage {
+    margin-bottom: 1.1em;
+    font-size: 1.08em;
+    line-height: 1.8;
+    font-weight: bold;
+    color: #fff;
+  }
+
+  #folderPickerGo,
+  #folderPickerCancel {
+    display: block;
+    width: 72%;
+    max-width: 280px;
+    margin: 0.65em auto;
+    padding: 0.7em 1em;
+    border: 1px solid rgba(255,255,255,0.75);
+    border-radius: 10px;
+    background: rgba(255,255,255,0.10);
+    color: #fff;
+    font-size: 1.15em;
+    font-weight: bold;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  #folderPickerGo:active,
+  #folderPickerCancel:active {
+    transform: scale(0.97);
+    background: rgba(255,255,255,0.22);
+  }
+
+  #folderPickerCancel {
+    font-size: 1.0em;
+  }
+
+  /* ========================================
      音楽ボタン
      ======================================== */
 
@@ -491,6 +595,16 @@
       ♪「OtoLogic」より ♫
     </button>
 
+    <!-- ========================================
+         Ver.10 音楽再生元
+         ======================================== -->
+    <div id="musicSourceSelector">
+      <label><input type="radio" name="musicSource" value="github" checked>GitHub</label>
+      <label><input type="radio" name="musicSource" value="local">Local</label>
+      <label><input type="radio" name="musicSource" value="extra">External</label>
+    </div>
+    <div id="musicSourceHint">Local / External はLong-tapでフォルダー変更</div>
+
 
     <!-- ========================================
          Long-tapで展開する音楽メニュー
@@ -500,6 +614,18 @@
     </div>
 
   </div>
+
+
+<!-- ========================================
+     Ver.10 フォルダー選択案内
+     ======================================== -->
+<div id="folderPickerDialog">
+  <div id="folderPickerPanel">
+    <div id="folderPickerMessage"></div>
+    <button id="folderPickerGo">フォルダーを選択</button>
+    <button id="folderPickerCancel">キャンセル</button>
+  </div>
+</div>
 
 
   <!-- ========================================
@@ -531,7 +657,7 @@
        ======================================== -->
 
   <button class="button" id="backButton">
-    戻　る
+    戻　る《Ver.10》
   </button>
 
 
@@ -579,6 +705,34 @@
 
 let musicCount = 0;
 let musicFilesFound = new Set();
+
+/*
+   音楽ファイルの対応拡張子
+
+   @music-xx.* をブラウザから直接列挙することはできないため、
+   主要な音声拡張子を順番に確認する。
+
+   優先順位は、従来のMP3動作を維持するためMP3を先頭にする。
+   同じ番号に複数形式が存在する場合は、この順で最初に見つかった
+   ファイルを再生する。
+*/
+const musicExtensions = [
+  'mp3',
+  'flac',
+  'm4a',
+  'aac',
+  'ogg',
+  'oga',
+  'opus',
+  'wav',
+  'webm'
+];
+
+/* Music-xx → 実際に検出したファイル */
+const musicFileMap = new Map();
+
+/* GitHub専用：GitHubの実ファイル管理はLocal/Extraと完全分離する */
+const githubMusicFileMap = new Map();
 
 /*
    音楽ファイル数の検出完了フラグ
@@ -750,6 +904,477 @@ const musicControl =
 
 
 /* ========================================
+   Ver.10 音楽再生元
+   ======================================== */
+const musicSourceSelector =
+  document.getElementById('musicSourceSelector');
+
+const folderPickerDialog =
+  document.getElementById('folderPickerDialog');
+
+const folderPickerMessage =
+  document.getElementById('folderPickerMessage');
+
+const folderPickerGo =
+  document.getElementById('folderPickerGo');
+
+const folderPickerCancel =
+  document.getElementById('folderPickerCancel');
+
+let musicSource = 'github';
+
+/*
+   音楽ソースごとの前回再生曲
+   GitHub / Local / External を切り替えても、
+   それぞれ最後に再生していた曲から再開する。
+*/
+const currentMusicBySource = {
+  github: 1,
+  local: 1,
+  extra: 1
+};
+
+function getSavedMusicForSource(source) {
+  const key = `fukiyaTestLastMusic_${source}`;
+  const saved = Number(localStorage.getItem(key));
+
+  if (Number.isInteger(saved) && saved >= 1) {
+    return saved;
+  }
+
+  return 1;
+}
+
+/* Local / Extraで選択したフォルダー */
+const sourceDirectoryHandles = {
+  local: null,
+  extra: null
+};
+
+/* ========================================
+   Ver.10 Local / External フォルダー記憶
+   Local と Extra の選択フォルダーを別々に記憶する。
+   ブラウザを閉じても次回起動時に前回のフォルダーを
+   選択開始位置として使用できるよう IndexedDB に保存する。
+   ======================================== */
+const directoryHandleDBName = 'fukiya-test-directory-handles';
+const directoryHandleStoreName = 'handles';
+
+function openDirectoryHandleDB() {
+  return new Promise(function(resolve, reject) {
+    const request = indexedDB.open(directoryHandleDBName, 1);
+
+    request.onupgradeneeded = function() {
+      request.result.createObjectStore(directoryHandleStoreName);
+    };
+
+    request.onsuccess = function() {
+      resolve(request.result);
+    };
+
+    request.onerror = function() {
+      reject(request.error);
+    };
+  });
+}
+
+async function saveDirectoryHandle(source, handle) {
+  try {
+    const db = await openDirectoryHandleDB();
+    await new Promise(function(resolve, reject) {
+      const tx = db.transaction(directoryHandleStoreName, 'readwrite');
+      tx.objectStore(directoryHandleStoreName).put(handle, source);
+      tx.oncomplete = resolve;
+      tx.onerror = function() { reject(tx.error); };
+    });
+    db.close();
+  } catch (error) {
+    console.log('フォルダー記憶を保存できませんでした:', error);
+  }
+}
+
+async function restoreDirectoryHandles() {
+  try {
+    const db = await openDirectoryHandleDB();
+
+    await new Promise(function(resolve, reject) {
+      const tx = db.transaction(directoryHandleStoreName, 'readonly');
+      const store = tx.objectStore(directoryHandleStoreName);
+
+      ['local', 'extra'].forEach(function(source) {
+        const request = store.get(source);
+        request.onsuccess = function() {
+          if (request.result) {
+            sourceDirectoryHandles[source] = request.result;
+          }
+        };
+      });
+
+      tx.oncomplete = resolve;
+      tx.onerror = function() { reject(tx.error); };
+    });
+
+    db.close();
+  } catch (error) {
+    console.log('前回のフォルダー記憶を読み込めませんでした:', error);
+  }
+}
+
+/* ページ起動時に Local / Extra の前回選択フォルダーを復元する */
+restoreDirectoryHandles();
+
+/* 現在選択されているフォルダー名（確認用） */
+let selectedMusicFolderName = '';
+
+/* Local / Extraで取得したFile → Object URL */
+let localMusicObjectUrls = [];
+let localMusicFiles = [];
+
+function getSelectedMusicSource() {
+  const checked =
+    musicSourceSelector.querySelector('input[name="musicSource"]:checked');
+
+  return checked ? checked.value : 'github';
+}
+
+function sourceLabel(source) {
+  if (source === 'local') return 'Local（内部メモリ）';
+  if (source === 'extra') return 'External（外部メモリ）';
+  return 'GitHub';
+}
+
+function showFolderPickerDialog(source) {
+  folderPickerMessage.innerHTML =
+    `${sourceLabel(source)}内のフォルダー一覧を表示します<br>` +
+    `音楽フォルダーを選択してください` +
+    (source === 'extra' ? `<br><small>※SDカードを使用する場合は、表示されたファイル選択画面でSDカード側へ移動してください</small>` : '');
+
+  folderPickerDialog.style.display = 'flex';
+}
+
+function hideFolderPickerDialog() {
+  folderPickerDialog.style.display = 'none';
+}
+
+function releaseLocalMusicObjectUrls() {
+  localMusicObjectUrls.forEach(function(url) {
+    try {
+      URL.revokeObjectURL(url);
+    } catch (error) {}
+  });
+
+  localMusicObjectUrls = [];
+  localMusicFiles = [];
+}
+
+function isSupportedLocalMusicFile(file) {
+  const name = file.name || '';
+  const dot = name.lastIndexOf('.');
+  if (dot < 0) return false;
+
+  const extension =
+    name.slice(dot + 1).toLowerCase();
+
+  return musicExtensions.includes(extension);
+}
+
+async function collectLocalMusicFiles(directoryHandle, pathPrefix = '') {
+  const results = [];
+
+  for await (const entry of directoryHandle.values()) {
+    if (entry.kind === 'file') {
+      try {
+        const file = await entry.getFile();
+        if (isSupportedLocalMusicFile(file)) {
+          results.push({
+            file: file,
+            path: pathPrefix + file.name
+          });
+        }
+      } catch (error) {
+        console.log('音楽ファイル取得をスキップしました:', error);
+      }
+    }
+    else if (entry.kind === 'directory') {
+      const child =
+        await collectLocalMusicFiles(
+          entry,
+          pathPrefix + entry.name + '/'
+        );
+
+      results.push(...child);
+    }
+  }
+
+  return results;
+}
+
+async function loadLocalMusicFromDirectory(directoryHandle) {
+  releaseLocalMusicObjectUrls();
+  musicFileMap.clear();
+  musicFilesFound = new Set();
+  musicCount = 0;
+  musicTitleCache.clear();
+
+  const results =
+    await collectLocalMusicFiles(directoryHandle);
+
+  results.sort(function(a, b) {
+    return a.path.localeCompare(b.path, 'ja', {
+      numeric: true,
+      sensitivity: 'base'
+    });
+  });
+
+  localMusicFiles = results.map(function(item) {
+    return item.file;
+  });
+
+  localMusicFiles.forEach(function(file, index) {
+    const number = index + 1;
+    const url = URL.createObjectURL(file);
+
+    localMusicObjectUrls.push(url);
+    musicFileMap.set(number, url);
+    musicFilesFound.add(number);
+  });
+
+  musicCount = localMusicFiles.length;
+  musicReady = true;
+  createMusicMenu();
+
+  return musicCount;
+}
+
+async function chooseLocalMusicFolder(source, forcePicker = false, autoPlay = false) {
+  musicSource = source;
+  if (!window.showDirectoryPicker) {
+    folderPickerMessage.innerHTML = 'このブラウザはフォルダー選択に対応していません。';
+    return false;
+  }
+
+  /* 記憶済みHandleはPickerを開かず直接使用する */
+  if (!forcePicker && sourceDirectoryHandles[source]) {
+    try {
+      const handle = sourceDirectoryHandles[source];
+      let permission = await handle.queryPermission({ mode: 'read' });
+      if (permission !== 'granted') {
+        permission = await handle.requestPermission({ mode: 'read' });
+      }
+      if (permission === 'granted') {
+        selectedMusicFolderName = handle.name || '';
+        const count = await loadLocalMusicFromDirectory(handle);
+        if (count > 0) {
+          currentMusic = currentMusicBySource[source] || getSavedMusicForSource(source);
+          if (!musicFileMap.has(currentMusic)) {
+            currentMusic = Array.from(musicFilesFound).sort((a, b) => a - b)[0] || 1;
+          }
+          saveCurrentMusic();
+          musicMode = 'none';
+          hideFolderPickerDialog();
+
+          /*
+             フォルダー切替え時は即再生しない。
+             「My MUSIC再生」ボタンを押した時に再生する。
+          */
+          showInitialButton();
+
+          if (autoPlay) {
+            musicMode = 'all';
+            await playMusic(currentMusic, 'hint');
+          }
+
+          return true;
+        }
+      }
+    } catch (error) {
+      console.log(`${source} の記憶フォルダーを直接使用できませんでした:`, error);
+    }
+  }
+
+  /* 初回、または「フォルダー変更」の場合だけPickerを開く */
+  try {
+    const options = {
+      mode: 'read',
+      id: source === 'local' ? 'fukiya-music-local' : 'fukiya-music-extra'
+    };
+    folderPickerMessage.innerHTML = source === 'extra'
+      ? 'External側を含むフォルダーを選択してください<br>SDメモリの場合は「≡」からExternalを選択してください'
+      : '音楽フォルダーを選択してください';
+
+    const directoryHandle = await window.showDirectoryPicker(options);
+    sourceDirectoryHandles[source] = directoryHandle;
+    await saveDirectoryHandle(source, directoryHandle);
+    selectedMusicFolderName = directoryHandle.name || '';
+
+    const count = await loadLocalMusicFromDirectory(directoryHandle);
+    if (count === 0) {
+      folderPickerMessage.innerHTML = `${sourceLabel(source)}で音楽ファイルが見つかりませんでした。<br>別のフォルダーを選択してください`;
+      return false;
+    }
+    currentMusic = currentMusicBySource[source] || getSavedMusicForSource(source);
+    if (!musicFileMap.has(currentMusic)) {
+      currentMusic = Array.from(musicFilesFound).sort((a, b) => a - b)[0] || 1;
+    }
+    saveCurrentMusic();
+    musicMode = 'none';
+    hideFolderPickerDialog();
+
+    /*
+       フォルダー選択後も即再生しない。
+       「My MUSIC再生」ボタンを押した時に再生する。
+    */
+    showInitialButton();
+
+    if (autoPlay) {
+      musicMode = 'all';
+      await playMusic(currentMusic, 'hint');
+    }
+
+    return true;
+  } catch (error) {
+    if (error && error.name === 'AbortError') return false;
+    console.log('フォルダー選択に失敗しました:', error);
+    folderPickerMessage.innerHTML = 'フォルダーを選択できませんでした。<br>もう一度「フォルダーを選択」を押してください';
+    return false;
+  }
+}
+
+/* ========================================
+   Local / External のLong-tap
+   短tap  : 記憶済みフォルダーを使用
+   Long-tap: フォルダー変更用ダイアログを表示
+   ======================================== */
+const sourceLongTapTime = 600;
+let sourceLongTapTimer = null;
+let sourceLongTapTriggered = false;
+let sourceLongTapSource = null;
+
+function startSourceLongTap(source) {
+  if (source !== 'local' && source !== 'extra') return;
+
+  sourceLongTapTriggered = false;
+  sourceLongTapSource = source;
+
+  clearTimeout(sourceLongTapTimer);
+
+  sourceLongTapTimer = setTimeout(function() {
+    sourceLongTapTimer = null;
+    sourceLongTapTriggered = true;
+
+    /* Long-tapではラジオ切替を発生させず、変更画面だけを表示 */
+    showFolderPickerDialog(source);
+  }, sourceLongTapTime);
+}
+
+function cancelSourceLongTap() {
+  clearTimeout(sourceLongTapTimer);
+  sourceLongTapTimer = null;
+}
+
+const sourceLabels =
+  musicSourceSelector.querySelectorAll('label');
+
+sourceLabels.forEach(function(label) {
+  const input = label.querySelector('input[name="musicSource"]');
+  if (!input) return;
+
+  const source = input.value;
+
+  label.addEventListener('pointerdown', function() {
+    startSourceLongTap(source);
+  });
+
+  label.addEventListener('pointerup', function() {
+    cancelSourceLongTap();
+  });
+
+  label.addEventListener('pointercancel', function() {
+    cancelSourceLongTap();
+    sourceLongTapTriggered = false;
+  });
+
+  label.addEventListener('pointerleave', function() {
+    cancelSourceLongTap();
+  });
+
+  /* Long-tap後に発生するclickでラジオを切り替えない */
+  label.addEventListener('click', function(event) {
+    if (sourceLongTapTriggered && sourceLongTapSource === source) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      sourceLongTapTriggered = false;
+      sourceLongTapSource = null;
+    }
+  }, true);
+
+  label.addEventListener('contextmenu', function(event) {
+    if (sourceLongTapTriggered && sourceLongTapSource === source) {
+      event.preventDefault();
+      event.stopImmediatePropagation();
+      sourceLongTapTriggered = false;
+      sourceLongTapSource = null;
+    }
+  });
+});
+
+/* 音楽再生元変更 */
+musicSourceSelector.addEventListener(
+  'change',
+  async function() {
+    const nextSource = getSelectedMusicSource();
+    if (nextSource === musicSource) return;
+
+    /* 切替え前のソースの最後の曲を保存 */
+    saveCurrentMusic();
+
+    musicSource = nextSource;
+    musicDetectionGeneration++;
+    musicDetectionStarted = false;
+
+    music.pause();
+    music.currentTime = 0;
+    music.src = '';
+    musicMode = 'none';
+
+    /* 切替え先ソースは、そのソースの前回曲を復元 */
+    currentMusic = currentMusicBySource[nextSource] || getSavedMusicForSource(nextSource);
+
+    if (nextSource === 'github') {
+      saveCurrentMusic();
+      showInitialButton();
+      return;
+    }
+
+    /*
+       Local / Extra はラジオボタンごとの記憶Handleを
+       直接使用する。AndroidのPickerの「直前の場所」を使わない。
+    */
+    if (sourceDirectoryHandles[nextSource]) {
+      await chooseLocalMusicFolder(nextSource, false, false);
+    } else {
+      showFolderPickerDialog(nextSource);
+    }
+  }
+);
+
+folderPickerGo.addEventListener(
+  'click',
+  async function() {
+    /* GOを押した瞬間のラジオ選択を必ず使用する */
+    const selectedSource = getSelectedMusicSource();
+    await chooseLocalMusicFolder(selectedSource, true, false);
+  }
+);
+
+folderPickerCancel.addEventListener(
+  'click',
+  function() {
+    hideFolderPickerDialog();
+  }
+);
+
+/* ========================================
    音楽タイトル
    再生処理とは完全に独立させる。
    タイトル取得に失敗しても音楽再生には影響させない。
@@ -797,73 +1422,166 @@ function getMusicTitleFromBuffer(buffer) {
   const uint8 = new Uint8Array(buffer);
   const view = new DataView(buffer);
 
-  /* ID3v2ヘッダー確認 */
+  /* ========================================
+     MP3 / ID3v2
+     ======================================== */
   if (
-    uint8.length < 10 ||
-    uint8[0] !== 0x49 ||
-    uint8[1] !== 0x44 ||
-    uint8[2] !== 0x33
+    uint8.length >= 10 &&
+    uint8[0] === 0x49 &&
+    uint8[1] === 0x44 &&
+    uint8[2] === 0x33
   ) {
-    return '';
-  }
+    /* Gemini-toolと同じく生バイトからTIT2/TT2を検索 */
+    let index = findBytes(uint8, [0x54, 0x49, 0x54, 0x32]);
+    let frameHeaderSize = 10;
 
-  /* Gemini-toolと同じく生バイトからTIT2を検索 */
-  let index = findBytes(uint8, [0x54, 0x49, 0x54, 0x32]);
-  let frameHeaderSize = 10;
-
-  /* ID3v2.2 */
-  if (index === -1) {
-    index = findBytes(uint8, [0x54, 0x54, 0x32]);
-    frameHeaderSize = 6;
-  }
-
-  if (index === -1) return '';
-
-  let frameSize;
-
-  if (frameHeaderSize === 10) {
-    frameSize =
-      (view.getUint8(index + 4) << 24) |
-      (view.getUint8(index + 5) << 16) |
-      (view.getUint8(index + 6) << 8) |
-      view.getUint8(index + 7);
-  } else {
-    frameSize =
-      (view.getUint8(index + 3) << 16) |
-      (view.getUint8(index + 4) << 8) |
-      view.getUint8(index + 5);
-  }
-
-  if (frameSize <= 1) return '';
-
-  const textStart = index + frameHeaderSize;
-  const textEnd = textStart + frameSize;
-
-  if (textStart >= uint8.length || textEnd > uint8.length) return '';
-
-  const encoding = uint8[textStart];
-  const textBytes = uint8.slice(textStart + 1, textEnd);
-
-  let title = '';
-
-  try {
-    if (encoding === 1 || encoding === 2) {
-      title = new TextDecoder('utf-16').decode(textBytes);
-    } else if (encoding === 3) {
-      title = new TextDecoder('utf-8').decode(textBytes);
-    } else {
-      title = new TextDecoder('shift_jis').decode(textBytes);
+    /* ID3v2.2 */
+    if (index === -1) {
+      index = findBytes(uint8, [0x54, 0x54, 0x32]);
+      frameHeaderSize = 6;
     }
-  } catch (error) {
-    return '';
+
+    if (index !== -1) {
+      let frameSize;
+
+      if (frameHeaderSize === 10) {
+        frameSize =
+          (view.getUint8(index + 4) << 24) |
+          (view.getUint8(index + 5) << 16) |
+          (view.getUint8(index + 6) << 8) |
+          view.getUint8(index + 7);
+      } else {
+        frameSize =
+          (view.getUint8(index + 3) << 16) |
+          (view.getUint8(index + 4) << 8) |
+          view.getUint8(index + 5);
+      }
+
+      if (frameSize > 1) {
+        const textStart = index + frameHeaderSize;
+        const textEnd = textStart + frameSize;
+
+        if (textStart < uint8.length && textEnd <= uint8.length) {
+          const encoding = uint8[textStart];
+          const textBytes = uint8.slice(textStart + 1, textEnd);
+          let title = '';
+
+          try {
+            if (encoding === 1 || encoding === 2) {
+              title = new TextDecoder('utf-16').decode(textBytes);
+            } else if (encoding === 3) {
+              title = new TextDecoder('utf-8').decode(textBytes);
+            } else {
+              title = new TextDecoder('shift_jis').decode(textBytes);
+            }
+          } catch (error) {
+            title = '';
+          }
+
+          title = title
+            .replace(/\0/g, '')
+            .replace(/[\x00-\x1F\x7F]/g, '')
+            .trim();
+
+          if (title) return title;
+        }
+      }
+    }
   }
 
-  return title
-    .replace(/\0/g, '')
-    .replace(/[\x00-\x1F\x7F]/g, '')
-    .trim();
-}
+  /* ========================================
+     FLAC / Vorbis Comment
 
+     FLACのTITLEはVorbis Commentメタデータブロック
+     (block type = 4) の KEY=VALUE 形式で格納される。
+     ======================================== */
+  let flacStart = -1;
+
+  /* 通常のFLACは先頭がfLaC */
+  if (
+    uint8.length >= 4 &&
+    uint8[0] === 0x66 &&
+    uint8[1] === 0x4C &&
+    uint8[2] === 0x61 &&
+    uint8[3] === 0x43
+  ) {
+    flacStart = 0;
+  } else {
+    /* ID3v2が先頭に付くFLACにも対応 */
+    flacStart = findBytes(uint8, [0x66, 0x4C, 0x61, 0x43]);
+  }
+
+  if (flacStart !== -1 && flacStart + 4 <= uint8.length) {
+    let offset = flacStart + 4;
+
+    while (offset + 4 <= uint8.length) {
+      const blockHeader = view.getUint8(offset);
+      const isLast = (blockHeader & 0x80) !== 0;
+      const blockType = blockHeader & 0x7F;
+      const blockSize =
+        (view.getUint8(offset + 1) << 16) |
+        (view.getUint8(offset + 2) << 8) |
+        view.getUint8(offset + 3);
+
+      offset += 4;
+
+      if (offset + blockSize > uint8.length) break;
+
+      if (blockType === 4 && blockSize >= 8) {
+        let p = offset;
+
+        /* vendor_length */
+        const vendorLength = view.getUint32(p, true);
+        p += 4;
+        if (p + vendorLength > offset + blockSize) break;
+        p += vendorLength;
+
+        /* user_comment_list_length */
+        if (p + 4 > offset + blockSize) break;
+        const commentCount = view.getUint32(p, true);
+        p += 4;
+
+        for (let i = 0; i < commentCount; i++) {
+          if (p + 4 > offset + blockSize) break;
+
+          const commentLength = view.getUint32(p, true);
+          p += 4;
+
+          if (p + commentLength > offset + blockSize) break;
+
+          try {
+            const comment = new TextDecoder('utf-8').decode(
+              uint8.slice(p, p + commentLength)
+            );
+            const equal = comment.indexOf('=');
+
+            if (equal > 0) {
+              const key = comment.slice(0, equal).trim().toUpperCase();
+              if (key === 'TITLE') {
+                const title = comment
+                  .slice(equal + 1)
+                  .replace(/\0/g, '')
+                  .replace(/[\x00-\x1F\x7F]/g, '')
+                  .trim();
+
+                if (title) return title;
+              }
+            }
+          } catch (error) {
+            /* このコメントは読み飛ばして次を確認 */
+          }
+
+          p += commentLength;
+        }
+      }
+
+      offset += blockSize;
+      if (isLast) break;
+    }
+  }
+
+  return '';
+}
 function readMusicTitleWithFileReader(blob) {
   return new Promise(function(resolve) {
     const reader = new FileReader();
@@ -893,15 +1611,27 @@ async function fetchMusicTitle(number) {
     return musicTitleCache.get(number);
   }
 
-  const file = getMusicFile(number);
+  let file = getMusicFile(number);
 
   try {
     /*
-       Gemini-toolのFileReader方式に合わせるため、
-       まずMP3をBlobとして取得し、そのBlobをFileReaderで読む。
-       この処理は音楽再生とは完全に独立している。
+       まず現在判明しているファイルを取得する。
+       MP3なら従来通り即座にタイトル取得を試みる。
     */
-    const response = await fetch(file, { cache: 'no-store' });
+    let response = await fetch(file, { cache: 'no-store' });
+
+    /*
+       MP3が存在しない場合だけ、他の対応拡張子を探す。
+       これにより、FLAC等でもタイトル取得処理へ進める。
+    */
+    if (!response.ok) {
+      const resolvedFile = await findMusicFile(number);
+      if (!resolvedFile) return '';
+
+      file = resolvedFile;
+      response = await fetch(file, { cache: 'no-store' });
+    }
+
     if (!response.ok) return '';
 
     const blob = await response.blob();
@@ -917,7 +1647,6 @@ async function fetchMusicTitle(number) {
     return '';
   }
 }
-
 function showMusicLongTapHint() {
   musicHint.innerHTML = '選曲はLong-tap/左右フリック';
 }
@@ -1060,8 +1789,115 @@ let longTapTriggered = false;
 
 function getMusicFile(number) {
 
-  return `@music-${number}.mp3`;
+  if (musicSource !== 'github') {
+    if (musicFileMap.has(number)) {
+      return musicFileMap.get(number);
+    }
+    return '';
+  }
 
+  if (githubMusicFileMap.has(number)) {
+    return githubMusicFileMap.get(number);
+  }
+
+  /* 前回検出した拡張子があれば、起動直後の先行ロードにも利用 */
+  const savedExtension =
+    localStorage.getItem(`fukiyaTestLastMusicExt-${number}`);
+
+  if (musicExtensions.includes(savedExtension)) {
+    return `@music-${number}.${savedExtension}`;
+  }
+
+  /* 従来通りMP3を最初に試す */
+  return `@music-${number}.mp3`;
+}
+
+
+/*
+   指定した音楽ファイルが実際に存在し、ブラウザで読み込めるか確認する。
+*/
+function probeMusicFile(file) {
+
+  return new Promise((resolve) => {
+
+    const testAudio = new Audio();
+    let finished = false;
+
+    const finish = (result) => {
+      if (finished) return;
+      finished = true;
+
+      testAudio.removeEventListener('loadedmetadata', onSuccess);
+      testAudio.removeEventListener('canplay', onSuccess);
+      testAudio.removeEventListener('error', onError);
+
+      testAudio.src = '';
+      resolve(result);
+    };
+
+    const onSuccess = () => finish(true);
+    const onError = () => finish(false);
+
+    testAudio.preload = 'metadata';
+    testAudio.addEventListener('loadedmetadata', onSuccess, { once: true });
+    testAudio.addEventListener('canplay', onSuccess, { once: true });
+    testAudio.addEventListener('error', onError, { once: true });
+    testAudio.src = file;
+    testAudio.load();
+
+  });
+}
+
+
+/*
+   @music-xx.* を実際の拡張子へ解決する。
+
+   同じ番号に複数形式がある場合は
+   MP3 → FLAC → M4A → AAC → OGG → OGA → OPUS → WAV → WEBM
+   の順で最初に見つかったものを採用する。
+*/
+async function findMusicFile(number) {
+
+  if (musicSource !== 'github') {
+    return musicFileMap.get(number) || '';
+  }
+
+  if (githubMusicFileMap.has(number)) {
+    return githubMusicFileMap.get(number);
+  }
+
+  const savedExtension =
+    localStorage.getItem(`fukiyaTestLastMusicExt-${number}`);
+
+  const extensions = [];
+
+  if (musicExtensions.includes(savedExtension)) {
+    extensions.push(savedExtension);
+  }
+
+  musicExtensions.forEach(function(extension) {
+    if (!extensions.includes(extension)) {
+      extensions.push(extension);
+    }
+  });
+
+  for (const extension of extensions) {
+
+    const file = `@music-${number}.${extension}`;
+    const exists = await probeMusicFile(file);
+
+    if (exists) {
+      githubMusicFileMap.set(number, file);
+      localStorage.setItem(
+        `fukiyaTestLastMusicExt-${number}`,
+        extension
+      );
+      return file;
+    }
+
+  }
+
+  return '';
 }
 
 
@@ -1071,75 +1907,47 @@ function getMusicFile(number) {
 
 async function detectMusicCount() {
 
+  if (musicSource !== 'github') {
+    /* Local / Extra はフォルダー選択時に検出済み */
+    return musicCount;
+  }
+
   musicCount = 0;
   musicFilesFound = new Set();
+  githubMusicFileMap.clear();
 
   /*
-     MP3は最大20個まで確認する。
-     番号に歯抜けがあっても検出する。
-     例：1, 3, 4 が存在する場合も対応。
+     GitHub版はMusic-1～Music-20を対象とする。
+     Local / Extraはフォルダー選択時に全曲を再帰取得するため、
+     ここでは検出しない。
   */
   const maxProbe = 20;
 
   for (let i = 1; i <= maxProbe; i++) {
 
-    const file = getMusicFile(i);
+    const file = await findMusicFile(i);
 
-    const exists = await new Promise((resolve) => {
-
-      const testAudio = new Audio();
-      let finished = false;
-
-      const finish = (result) => {
-        if (finished) return;
-        finished = true;
-        testAudio.removeEventListener('loadedmetadata', onSuccess);
-        testAudio.removeEventListener('canplay', onSuccess);
-        testAudio.removeEventListener('error', onError);
-        testAudio.src = '';
-        resolve(result);
-      };
-
-      const onSuccess = () => finish(true);
-      const onError = () => finish(false);
-
-      testAudio.preload = 'metadata';
-      testAudio.addEventListener('loadedmetadata', onSuccess, { once: true });
-      testAudio.addEventListener('canplay', onSuccess, { once: true });
-      testAudio.addEventListener('error', onError, { once: true });
-      testAudio.src = file;
-      testAudio.load();
-    });
-
-    if (exists) {
+    if (file) {
       musicFilesFound.add(i);
       musicCount = Math.max(musicCount, i);
     }
 
   }
 
-  /*
-     前回再生曲の存在を確認。
-     ただし起動時の選択は別途すでに行っている。
-     前回曲が存在しなければMusic-1へ変更する。
-  */
-  const savedMusic =
-    localStorage.getItem('fukiyaTestLastMusic');
-
-  const savedNumber = Number(savedMusic);
+  currentMusic = getSavedMusicForSource('github');
+  currentMusicBySource.github = currentMusic;
 
   if (
-    Number.isInteger(savedNumber) &&
-    savedNumber >= 1 &&
-    savedNumber <= maxProbe &&
-    musicFilesFound.has(savedNumber)
+    !Number.isInteger(currentMusic) ||
+    currentMusic < 1 ||
+    currentMusic > maxProbe ||
+    !musicFilesFound.has(currentMusic)
   ) {
-    currentMusic = savedNumber;
-  }
-  else {
     currentMusic = 1;
+    currentMusicBySource.github = 1;
   }
 
+  return musicCount;
 }
 
 
@@ -1149,8 +1957,10 @@ async function detectMusicCount() {
 
 function saveCurrentMusic() {
 
+  currentMusicBySource[musicSource] = currentMusic;
+
   localStorage.setItem(
-    'fukiyaTestLastMusic',
+    `fukiyaTestLastMusic_${musicSource}`,
     String(currentMusic)
   );
 
@@ -1558,9 +2368,28 @@ function showInitialButton() {
   musicHint.style.visibility =
     'hidden';
 
+  if (musicSource === 'local') {
+
+    musicButton.innerHTML =
+      `My MUSIC再生<br>
+       ♪内部メモリ(Local)より♫`;
+
+    return;
+  }
+
+  if (musicSource === 'extra') {
+
+    musicButton.innerHTML =
+      `My MUSIC再生<br>
+       ♪SDカード(External)より♫`;
+
+    return;
+  }
+
+  /* GitHub */
   musicButton.innerHTML =
     `癒やしの音楽<br>
-     ♪「OtoLogic」より ♫`;
+     ♪「OtoLogic」より♫`;
 
 }
 
@@ -1572,14 +2401,26 @@ function showInitialButton() {
 async function playMusic(number, titleDisplayMode = 'auto') {
 
   /*
-     MP3検出完了前でも再生できるようにする。
-     Music-1～Music-20の範囲なら再生を試みる。
+     再生番号の範囲
+
+     GitHub：Music-1～Music-20
+     Local / Extra：選択したフォルダー内で検出した全曲
   */
+  const maxPlayableMusic =
+    musicSource === 'github' ? 20 : musicCount;
+
   if (
     !Number.isInteger(number) ||
     number < 1 ||
-    number > 20
+    number > maxPlayableMusic
   ) {
+    return;
+  }
+
+  /*
+     Local / Extra はフォルダー選択完了後のみ再生する。
+  */
+  if (musicSource !== 'github' && !musicFileMap.has(number)) {
     return;
   }
 
@@ -1609,8 +2450,41 @@ async function playMusic(number, titleDisplayMode = 'auto') {
 
   saveCurrentMusic();
 
-  music.src =
-    getMusicFile(currentMusic);
+  /*
+     GitHubは、再生直前に実在するファイル形式まで解決する。
+     検出済みMapをここで削除しない。
+     これにより、Music-1がMP3以外（FLAC等）でも確実に
+     検出済みの実ファイルをそのまま再生できる。
+  */
+  if (musicSource === 'github') {
+    let resolvedGitHubFile = await findMusicFile(currentMusic);
+
+    /*
+       指定曲が存在しない場合は、Music-1～20から
+       最初に存在する曲を探す。
+       GitHub側で番号に欠番があっても再生開始できるようにする。
+    */
+    if (!resolvedGitHubFile) {
+      for (let i = 1; i <= 20; i++) {
+        resolvedGitHubFile = await findMusicFile(i);
+        if (resolvedGitHubFile) {
+          currentMusic = i;
+          saveCurrentMusic();
+          break;
+        }
+      }
+    }
+
+    if (!resolvedGitHubFile) {
+      console.log('GitHub側に再生可能な音楽ファイルがありません');
+      return;
+    }
+
+    music.src = resolvedGitHubFile;
+  }
+  else {
+    music.src = getMusicFile(currentMusic);
+  }
 
   /* タイトル取得は再生開始を待たせない */
   const titleRequestId = ++musicTitleRequestId;
@@ -1643,12 +2517,41 @@ async function playMusic(number, titleDisplayMode = 'auto') {
     showPlayingButton();
 
     /*
-       実際に再生が開始された後でMP3存在確認を開始する。
-       初回再生用MP3の読み込みを最優先する。
+       GitHub版のみ、実際に再生が開始された後で
+       音楽ファイル存在確認をバックグラウンド開始する。
+       Local / Extra はフォルダー選択時に検出済み。
     */
-    startMusicDetection();
+    if (musicSource === 'github') {
+      startMusicDetection();
+    }
 
   } catch (error) {
+
+    /*
+       まず @music-xx.mp3 以外の対応形式を探す。
+       MP3が無く、FLAC/M4A/AAC等だけが存在する場合は
+       ここで実ファイルへ切り替えて再生を再試行する。
+    */
+    const resolvedFile = await findMusicFile(currentMusic);
+
+    if (resolvedFile && music.src !== new URL(resolvedFile, location.href).href) {
+      music.src = resolvedFile;
+      music.load();
+
+      try {
+        await music.play();
+        showPlayingButton();
+        if (musicSource === 'github') {
+          startMusicDetection();
+        }
+        return;
+      } catch (retryError) {
+        console.log(
+          '対応音声形式の再生にも失敗しました:',
+          retryError
+        );
+      }
+    }
 
     /*
        起動直後で前回曲の存在確認がまだ終わっておらず、
@@ -1666,7 +2569,9 @@ async function playMusic(number, titleDisplayMode = 'auto') {
       try {
         await music.play();
         showPlayingButton();
-        startMusicDetection();
+        if (musicSource === 'github') {
+          startMusicDetection();
+        }
         return;
       } catch (retryError) {
         console.log(
@@ -1747,6 +2652,18 @@ musicButton.addEventListener(
       return;
     }
 
+    /*
+       Local / Extraで、まだ音楽フォルダーが選択されていない場合
+       → 案内画面を表示し、GOでshowDirectoryPicker()を起動する。
+    */
+    if (
+      musicSource !== 'github' &&
+      musicFilesFound.size === 0
+    ) {
+      showFolderPickerDialog(musicSource);
+      return;
+    }
+
     /* 再生中 → Pause */
     if (!music.paused) {
       music.pause();
@@ -1762,6 +2679,12 @@ musicButton.addEventListener(
 
     /* 完全停止状態 → Music all play開始 */
     musicMode = 'all';
+
+    /* GitHubへ戻った直後は、必ずGitHub側のMusic-1を起点にする */
+    if (musicSource === 'github' && !music.src) {
+      currentMusic = 1;
+    }
+
     await playMusic(currentMusic);
   }
 );
@@ -1877,8 +2800,8 @@ function createMusicMenu() {
   );
 
   /*
-     存在するMP3だけを表示する。
-     歯抜けにも対応。
+     存在する音楽ファイルだけを表示する。
+     MP3/FLAC/M4A/AAC等の混在と歯抜けにも対応。
   */
   for (
     let i = 1;
@@ -1954,7 +2877,7 @@ function showMusicMenu() {
      先に表示してメニュー上端を取得する。
      機種によって異なる画面高さ／ナビゲーション領域に
      合わせて、表示可能な高さだけを確保する。
-     これによりF-51Bでも最下段のMusic-20まで
+     これによりF-51Bでも検出された全曲を
      スクロールして表示できる。
   */
   musicMenu.style.display =
@@ -2158,19 +3081,28 @@ music.addEventListener(
 /*
    起動直後の音楽再生を最優先する。
 
-   MP3存在確認は起動時には開始しない。
-   初回再生用MP3の読み込みを他のMP3確認処理と競合させないため、
+   音楽ファイル存在確認は起動時には開始しない。
+   初回再生用ファイルの読み込みを他の検出処理と競合させないため、
    最初の再生開始後にバックグラウンドで検出する。
 */
 let musicDetectionStarted = false;
+let musicDetectionGeneration = 0;
 
 function startMusicDetection() {
 
+  if (musicSource !== 'github') return;
   if (musicDetectionStarted) return;
   musicDetectionStarted = true;
 
+  const generation = ++musicDetectionGeneration;
+  const detectionSource = musicSource;
+
   detectMusicCount()
     .then(function() {
+      /* 古いGitHub検出処理の結果は破棄する */
+      if (generation !== musicDetectionGeneration) return;
+      if (musicSource !== detectionSource) return;
+
       createMusicMenu();
       musicReady = true;
 
@@ -2182,8 +3114,11 @@ function startMusicDetection() {
       }
     })
     .catch(function(error) {
+      if (generation !== musicDetectionGeneration) return;
+      if (musicSource !== detectionSource) return;
+
       console.log(
-        'MP3検出中にエラーが発生しました:',
+        '音楽ファイル検出中にエラーが発生しました:',
         error
       );
 
@@ -2196,34 +3131,29 @@ async function initializeMusic() {
 
   /*
      起動時は音楽ボタンを即使用可能にする。
-     MP3存在確認はまだ開始しない。
+     音楽ファイル存在確認はまだ開始しない。
   */
   showInitialButton();
 }
 
 /*
    起動時の選曲は検出完了を待たずに決定する。
-   ①前回再生していたMP3
+   ①前回再生していた音楽ファイル
    ②①が無ければMusic-1
    前回情報がなければMusic-1。
 */
 (function loadInitialMusicSelection() {
 
-  const savedMusic =
-    localStorage.getItem('fukiyaTestLastMusic');
-
-  const savedNumber =
-    Number(savedMusic);
+  currentMusic = getSavedMusicForSource('github');
+  currentMusicBySource.github = currentMusic;
 
   if (
-    Number.isInteger(savedNumber) &&
-    savedNumber >= 1 &&
-    savedNumber <= 20
+    !Number.isInteger(currentMusic) ||
+    currentMusic < 1 ||
+    currentMusic > 20
   ) {
-    currentMusic = savedNumber;
-  }
-  else {
     currentMusic = 1;
+    currentMusicBySource.github = 1;
   }
 
   showInitialButton();
@@ -2233,7 +3163,8 @@ async function initializeMusic() {
 
      前回曲（またはMusic-1）を起動直後から
      音声要素へセットして先行ロードする。
-     MP3存在確認の完了は待たない。
+     前回検出済みの拡張子があれば、それを優先する。
+     音声形式の存在確認完了は待たない。
      ======================================== */
   music.preload = 'auto';
   music.src = getMusicFile(currentMusic);
