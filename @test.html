@@ -490,6 +490,24 @@
      動画
      ======================================== */
 
+  /* ========================================
+     開発用 IndexedDB 完全初期化
+     ======================================== */
+  #indexedDBResetButton {
+    margin-top: 2.0em;
+    font-size: 1.0em;
+    color: #fff;
+    border-color: rgba(255,120,120,0.9);
+    background: rgba(120,0,0,0.28);
+  }
+
+  #indexedDBResetButton:disabled {
+    opacity: 0.45;
+    cursor: default;
+    transform: none;
+  }
+
+
   #videoArea {
     display: none;
 
@@ -657,9 +675,17 @@
        ======================================== -->
 
   <button class="button" id="backButton">
-    戻　る《ver.11j》
+    戻　る《ver.11v》
   </button>
 
+
+
+
+  <!-- ========================================
+       開発用 IndexedDB 完全初期化
+       走査中は安全のため自動的に操作不可とする。
+       ======================================== -->
+  <button class="button" id="indexedDBResetButton">IndexedDB完全初期化</button>
 
 
 </div>
@@ -957,6 +983,16 @@ const sourceDirectoryHandles = {
   extra: null
 };
 
+/* 開発用IndexedDB初期化ボタンの安全制御。
+   フォルダー走査中は無効化し、走査とDB削除を競合させない。 */
+let musicScanInProgress = 0;
+
+function updateIndexedDBResetButtonState() {
+  const button = document.getElementById('indexedDBResetButton');
+  if (!button) return;
+  button.disabled = musicScanInProgress > 0;
+}
+
 /* ========================================
    Ver.11 Local / External フォルダー記憶
    Local と Extra の選択フォルダーを別々に記憶する。
@@ -966,12 +1002,42 @@ const sourceDirectoryHandles = {
 const directoryHandleDBName = 'fukiya-test-directory-handles';
 const directoryHandleStoreName = 'handles';
 
+/*
+   Local / External の音楽索引Table。
+   File / Blob / Object URL はIndexedDBへ保存しない。
+*/
+const localMusicTableStoreName = 'localTable';
+const externalMusicTableStoreName = 'externalTable';
+
+function getMusicTableStoreName(source) {
+  return source === 'extra'
+    ? externalMusicTableStoreName
+    : localMusicTableStoreName;
+}
+
 function openDirectoryHandleDB() {
   return new Promise(function(resolve, reject) {
-    const request = indexedDB.open(directoryHandleDBName, 1);
+    const request = indexedDB.open(directoryHandleDBName, 3);
 
     request.onupgradeneeded = function() {
-      request.result.createObjectStore(directoryHandleStoreName);
+      const db = request.result;
+
+      if (!db.objectStoreNames.contains(directoryHandleStoreName)) {
+        db.createObjectStore(directoryHandleStoreName);
+      }
+
+      if (!db.objectStoreNames.contains(localMusicTableStoreName)) {
+        db.createObjectStore(localMusicTableStoreName, { keyPath: 'key' });
+      }
+
+      if (!db.objectStoreNames.contains(externalMusicTableStoreName)) {
+        db.createObjectStore(externalMusicTableStoreName, { keyPath: 'key' });
+      }
+
+      /* 旧Ver.の「音楽File保存用Store」は廃止する。 */
+      if (db.objectStoreNames.contains('musicCaches')) {
+        db.deleteObjectStore('musicCaches');
+      }
     };
 
     request.onsuccess = function() {
@@ -1026,84 +1092,500 @@ async function restoreDirectoryHandles() {
   }
 }
 
-/* ページ起動時に Local / Extra の前回選択フォルダーを復元する */
 const directoryHandlesRestorePromise = restoreDirectoryHandles();
 
-/* 現在選択されているフォルダー名（確認用） */
-let selectedMusicFolderName = '';
+/* ========================================
+   Local / External 音楽索引Table
 
-/* Local / Extraで取得したFile → Object URL */
-let localMusicObjectUrls = [];
-let localMusicFiles = [];
+   Tableには「どこに何があるか」だけを保存する。
+   実際のFile / Blobは保存しない。
+   ======================================== */
 
-/* Local / External を個別に保持する実行中キャッシュ。
-   通常のソース切替えでは再走査せず、このキャッシュを切替える。 */
-const sourceMusicCaches = {
+const sourceMusicTables = {
   local: null,
   extra: null
 };
 
-/*
-   各ソースのキャッシュを「そのソース自身が所有するObject URL」として保持する。
-   他ソースへ切り替えた時に、現在ソースのURLを解放しても
-   別ソースのキャッシュURLまで revoke しない。
-*/
-function captureLocalMusicCache(source) {
-  if (source !== 'local' && source !== 'extra') return;
+/* 既存UIのsourceMusicCaches参照は、永続Table状態をそのまま利用する。 */
+const sourceMusicCaches = sourceMusicTables;
 
-  sourceMusicCaches[source] = {
-    fileMap: new Map(musicFileMap),
-    filesFound: new Set(musicFilesFound),
-    objectUrls: [...localMusicObjectUrls],
-    files: [...localMusicFiles],
-    count: musicCount,
-    ready: musicReady,
-    folderName: selectedMusicFolderName
-  };
+function compareMusicPath(a, b) {
+  return String(a).localeCompare(String(b), 'ja', {
+    numeric: true,
+    sensitivity: 'base'
+  });
 }
 
+function sortScanQueue(queue) {
+  queue.sort(function(a, b) {
+    return compareMusicPath(a.path, b.path);
+  });
+}
+
+function getFolderKeyFromPath(path) {
+  const parts = String(path).split('/').filter(Boolean);
+  return parts.length > 1 ? parts[0] : '__ROOT__';
+}
+
+function getFolderCode(meta, folderKey) {
+  if (!meta.folderCodes) meta.folderCodes = {};
+
+  if (!meta.folderCodes[folderKey]) {
+    const used = new Set(Object.values(meta.folderCodes));
+    let code = '';
+    for (let i = 0; i < 26; i++) {
+      const candidate = String.fromCharCode(65 + i);
+      if (!used.has(candidate)) {
+        code = candidate;
+        break;
+      }
+    }
+    if (!code) {
+      code = `F${Object.keys(meta.folderCodes).length + 1}`;
+    }
+    meta.folderCodes[folderKey] = code;
+  }
+
+  return meta.folderCodes[folderKey];
+}
+
+function getDisplayMusicId(record) {
+  if (!record) return '';
+  return record.displayId || `Music-${record.folderCode || 'A'}-${String(record.folderMusicNumber || record.number).padStart(2, '0')}`;
+}
+
+async function getMusicTableMeta(source) {
+  const storeName = getMusicTableStoreName(source);
+  const db = await openDirectoryHandleDB();
+
+  const meta = await new Promise(function(resolve, reject) {
+    const tx = db.transaction(storeName, 'readonly');
+    const request = tx.objectStore(storeName).get('__meta__');
+    request.onsuccess = function() { resolve(request.result || null); };
+    request.onerror = function() { reject(request.error); };
+  });
+
+  db.close();
+  return meta;
+}
+
+async function saveMusicTableMeta(source, meta) {
+  const storeName = getMusicTableStoreName(source);
+  const db = await openDirectoryHandleDB();
+
+  await new Promise(function(resolve, reject) {
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).put(meta);
+    tx.oncomplete = resolve;
+    tx.onerror = function() { reject(tx.error); };
+  });
+
+  db.close();
+}
+
+async function loadMusicTableRecords(source) {
+  const storeName = getMusicTableStoreName(source);
+  const db = await openDirectoryHandleDB();
+
+  const records = await new Promise(function(resolve, reject) {
+    const tx = db.transaction(storeName, 'readonly');
+    const request = tx.objectStore(storeName).getAll();
+    request.onsuccess = function() { resolve(request.result || []); };
+    request.onerror = function() { reject(request.error); };
+  });
+
+  db.close();
+  return records;
+}
+
+async function restoreMusicTable(source) {
+  if (source !== 'local' && source !== 'extra') return null;
+
+  try {
+    await directoryHandlesRestorePromise;
+    const records = await loadMusicTableRecords(source);
+    const meta = records.find(function(item) {
+      return item && item.key === '__meta__';
+    });
+
+    if (!meta) return null;
+
+    const musicRecords = records
+      .filter(function(item) {
+        return item && item.type === 'music';
+      })
+      .sort(function(a, b) {
+        return a.number - b.number;
+      });
+
+    sourceMusicTables[source] = {
+      meta: meta,
+      records: new Map(musicRecords.map(function(item) {
+        return [item.number, item];
+      })),
+      ready: musicRecords.length > 0 || meta.completed === true
+    };
+
+    return sourceMusicTables[source];
+
+  } catch (error) {
+    console.log(`${source} の音楽索引Tableを復元できませんでした:`, error);
+    return null;
+  }
+}
+
+async function initializeMusicTable(source, directoryHandle) {
+  const existing = await getMusicTableMeta(source);
+
+  if (existing && existing.folderName === (directoryHandle.name || '')) {
+    /* 既存Tableを再利用する。recordsも同時にメモリへ復元する。 */
+    await restoreMusicTable(source);
+    return existing;
+  }
+
+  /* 新しいフォルダーを選択した場合は、そのソースのTableだけを作り直す。 */
+  await deleteMusicTableFromDB(source);
+
+  const meta = {
+    key: '__meta__',
+    type: 'meta',
+    folderName: directoryHandle.name || '',
+    completed: false,
+    nextMusicNumber: 1,
+    pendingEntries: [
+      { kind: 'directory', path: '' }
+    ],
+    folderCodes: {},
+    folderSongCounts: {},
+    updatedAt: Date.now()
+  };
+
+  await saveMusicTableMeta(source, meta);
+
+  sourceMusicTables[source] = {
+    meta: meta,
+    records: new Map(),
+    ready: false
+  };
+
+  return meta;
+}
+
+async function deleteMusicTableFromDB(source) {
+  if (source !== 'local' && source !== 'extra') return;
+
+  const storeName = getMusicTableStoreName(source);
+  const db = await openDirectoryHandleDB();
+
+  await new Promise(function(resolve, reject) {
+    const tx = db.transaction(storeName, 'readwrite');
+    tx.objectStore(storeName).clear();
+    tx.oncomplete = resolve;
+    tx.onerror = function() { reject(tx.error); };
+  });
+
+  db.close();
+  sourceMusicTables[source] = null;
+}
+
+async function resolveDirectoryHandleByPath(rootHandle, relativePath) {
+  let handle = rootHandle;
+  const parts = String(relativePath || '')
+    .split('/')
+    .filter(Boolean);
+
+  for (const part of parts) {
+    handle = await handle.getDirectoryHandle(part);
+  }
+
+  return handle;
+}
+
+async function getFileFromMusicPath(rootHandle, relativePath) {
+  const parts = String(relativePath || '')
+    .split('/')
+    .filter(Boolean);
+
+  if (parts.length === 0) return null;
+
+  const fileName = parts.pop();
+  const parentPath = parts.join('/');
+  const parentHandle = await resolveDirectoryHandleByPath(
+    rootHandle,
+    parentPath
+  );
+
+  const fileHandle = await parentHandle.getFileHandle(fileName);
+  return await fileHandle.getFile();
+}
+
+async function saveMusicRecordAndMeta(source, record, meta) {
+  const storeName = getMusicTableStoreName(source);
+  const db = await openDirectoryHandleDB();
+
+  await new Promise(function(resolve, reject) {
+    const tx = db.transaction(storeName, 'readwrite');
+    const store = tx.objectStore(storeName);
+    store.put(record);
+    store.put(meta);
+    tx.oncomplete = resolve;
+    tx.onerror = function() { reject(tx.error); };
+  });
+
+  db.close();
+}
+
+async function enumerateDirectoryIntoQueue(directoryHandle, directoryPath, meta) {
+  const entries = [];
+
+  for await (const entry of directoryHandle.values()) {
+    const childPath = directoryPath
+      ? `${directoryPath}/${entry.name}`
+      : entry.name;
+
+    if (entry.kind === 'directory') {
+      entries.push({
+        kind: 'directory',
+        path: childPath
+      });
+    }
+    else if (entry.kind === 'file' && isSupportedLocalMusicFileName(entry.name)) {
+      entries.push({
+        kind: 'file',
+        path: childPath
+      });
+    }
+  }
+
+  meta.pendingEntries = meta.pendingEntries.concat(entries);
+  sortScanQueue(meta.pendingEntries);
+}
+
+function isSupportedLocalMusicFileName(name) {
+  const dot = String(name || '').lastIndexOf('.');
+  if (dot < 0) return false;
+
+  const extension =
+    String(name).slice(dot + 1).toLowerCase();
+
+  return musicExtensions.includes(extension);
+}
+
+/*
+   Local / Externalの永続スキャン。
+
+   ・Tableがcompletedなら再走査しない。
+   ・未完了ならpendingEntriesの先頭から再開する。
+   ・音楽File本体はTableへ保存しない。
+   ・1曲処理するたびにTableへcheckpointする。
+*/
+async function scanMusicTableInBackground(source, directoryHandle) {
+  if (source !== 'local' && source !== 'extra') return false;
+  if (!directoryHandle) return false;
+
+  const state = sourceMusicTables[source];
+  if (state && state.meta && state.meta.completed) {
+    return true;
+  }
+
+  if (state && state.scanning) {
+    return state.scanning;
+  }
+
+  const scanPromise = (async function() {
+    musicScanInProgress++;
+    updateIndexedDBResetButtonState();
+
+    try {
+      let meta = await initializeMusicTable(source, directoryHandle);
+      let table = sourceMusicTables[source];
+
+      while (meta.pendingEntries && meta.pendingEntries.length > 0) {
+        const item = meta.pendingEntries.shift();
+
+        if (item.kind === 'directory') {
+          const dirHandle = await resolveDirectoryHandleByPath(
+            directoryHandle,
+            item.path
+          );
+
+          await enumerateDirectoryIntoQueue(
+            dirHandle,
+            item.path,
+            meta
+          );
+
+          meta.updatedAt = Date.now();
+          await saveMusicTableMeta(source, meta);
+          continue;
+        }
+
+        if (item.kind !== 'file') continue;
+
+        try {
+          const file = await getFileFromMusicPath(
+            directoryHandle,
+            item.path
+          );
+
+          if (!file || !isSupportedLocalMusicFile(file)) {
+            continue;
+          }
+
+          const number = meta.nextMusicNumber++;
+          const folderKey = getFolderKeyFromPath(item.path);
+          const folderCode = getFolderCode(meta, folderKey);
+          const folderMusicNumber =
+            (meta.folderSongCounts[folderKey] || 0) + 1;
+
+          meta.folderSongCounts[folderKey] = folderMusicNumber;
+
+          const record = {
+            key: `music-${number}`,
+            type: 'music',
+            number: number,
+            displayId: `Music-${folderCode}-${String(folderMusicNumber).padStart(2, '0')}`,
+            folderCode: folderCode,
+            folderKey: folderKey,
+            folderMusicNumber: folderMusicNumber,
+            path: item.path,
+            fileName: file.name,
+            extension: String(file.name).split('.').pop().toLowerCase()
+          };
+
+          table.records.set(number, record);
+          table.ready = true;
+
+          await saveMusicRecordAndMeta(source, record, meta);
+
+          /* 連続したFile取得でUIを固めない。 */
+          await new Promise(function(resolve) {
+            setTimeout(resolve, 0);
+          });
+
+        } catch (error) {
+          console.log(`${source} の音楽ファイル走査をスキップしました:`, item.path, error);
+        }
+      }
+
+      meta.completed = true;
+      meta.updatedAt = Date.now();
+      await saveMusicTableMeta(source, meta);
+
+      table.ready = true;
+      return true;
+
+    } catch (error) {
+      console.log(`${source} の音楽索引Table走査を中断しました:`, error);
+      return false;
+
+    } finally {
+      musicScanInProgress--;
+      updateIndexedDBResetButtonState();
+    }
+  })();
+
+  sourceMusicTables[source] = sourceMusicTables[source] || {
+    meta: null,
+    records: new Map(),
+    ready: false
+  };
+  sourceMusicTables[source].scanning = scanPromise;
+
+  try {
+    return await scanPromise;
+  } finally {
+    if (sourceMusicTables[source]) {
+      sourceMusicTables[source].scanning = null;
+    }
+  }
+}
+
+function buildSourceMusicStateFromTable(source) {
+  const table = sourceMusicTables[source];
+  if (!table) return false;
+
+  musicFileMap = new Map();
+  musicFilesFound = new Set();
+  musicCount = 0;
+  musicReady = false;
+  localMusicFileEntries = [];
+  localMusicFiles = [];
+
+  table.records.forEach(function(record, number) {
+    musicFilesFound.add(number);
+    musicCount = Math.max(musicCount, number);
+    localMusicFileEntries.push({
+      number: number,
+      path: record.path,
+      displayId: record.displayId,
+      fileName: record.fileName,
+      extension: record.extension
+    });
+  });
+
+  localMusicFileEntries.sort(function(a, b) {
+    return a.number - b.number;
+  });
+
+  musicReady = musicFilesFound.size > 0;
+  selectedMusicFolderName = table.meta
+    ? (table.meta.folderName || '')
+    : '';
+
+  /* 既存のUI/再生制御が参照する互換プロパティ。File本体は持たない。 */
+  table.filesFound = new Set(musicFilesFound);
+  table.count = musicCount;
+  table.ready = musicReady || !!(table.meta && table.meta.completed);
+  table.folderName = selectedMusicFolderName;
+
+  if (musicReady) {
+    createMusicMenu();
+  }
+
+  return musicReady;
+}
+
+/*
+   Local / Externalを再走査せず、Tableから現在の索引を復元する。
+*/
+async function prepareLocalMusicSourceFromTable(source) {
+  const table = await restoreMusicTable(source);
+  if (!table) return false;
+
+  return buildSourceMusicStateFromTable(source);
+}
+
+/* 現在のソースを切替える。実ファイルは必要になった時だけ取得する。 */
 function activateLocalMusicCache(source) {
-  const cache = sourceMusicCaches[source];
-  if (!cache || !cache.ready || cache.filesFound.size === 0) return false;
+  if (source !== 'local' && source !== 'extra') return false;
 
-  /* 現在ソースの参照だけをキャッシュへ切り替える。
-     別ソースのObject URLには一切触れない。 */
-  musicFileMap = cache.fileMap;
-  musicFilesFound = cache.filesFound;
-  localMusicObjectUrls = cache.objectUrls;
-  localMusicFiles = cache.files;
-  musicCount = cache.count;
-  musicReady = true;
+  const table = sourceMusicTables[source];
+  if (!table) return false;
 
-  selectedMusicFolderName = cache.folderName || '';
-  createMusicMenu();
-  return true;
+  const ready = buildSourceMusicStateFromTable(source);
+  return ready;
 }
 
 function discardLocalMusicCache(source) {
-  const cache = sourceMusicCaches[source];
-  if (!cache) return;
+  if (source !== 'local' && source !== 'extra') return;
+  sourceMusicTables[source] = null;
+}
 
-  cache.objectUrls.forEach(function(url) {
+function clearActiveLocalMusicState() {
+  musicFileMap.forEach(function(url) {
     try { URL.revokeObjectURL(url); } catch (error) {}
   });
 
-  sourceMusicCaches[source] = null;
-}
-
-/*
-   現在選択中のLocal / External参照だけを空にする。
-   非アクティブ側のキャッシュ／Object URLは一切触らない。
-*/
-function clearActiveLocalMusicState() {
   musicFileMap = new Map();
   musicFilesFound = new Set();
   localMusicObjectUrls = [];
   localMusicFiles = [];
+  localMusicFileEntries = [];
   musicCount = 0;
   musicReady = false;
   selectedMusicFolderName = '';
-  musicTitleCache.clear();
+  getMusicTitleCache(musicSource).clear();
 }
 
 function getSelectedMusicSource() {
@@ -1122,11 +1604,6 @@ function sourceLabel(source) {
 let folderPickerSource = null;
 
 function showFolderPickerDialog(source) {
-  /*
-     Long-tapされたLocal / Externalを、そのままフォルダー選択対象として保持する。
-     ダイアログ表示後にラジオ選択状態を参照すると、
-     Long-tapした側と別ソースを開いてしまうため。
-  */
   folderPickerSource = source;
 
   folderPickerMessage.innerHTML =
@@ -1153,119 +1630,98 @@ function releaseLocalMusicObjectUrls() {
 }
 
 function isSupportedLocalMusicFile(file) {
-  const name = file.name || '';
-  const dot = name.lastIndexOf('.');
-  if (dot < 0) return false;
-
-  const extension =
-    name.slice(dot + 1).toLowerCase();
-
-  return musicExtensions.includes(extension);
+  return isSupportedLocalMusicFileName(file && file.name);
 }
 
-async function collectLocalMusicFiles(directoryHandle, pathPrefix = '') {
-  const results = [];
+/*
+   Tableから必要な1曲だけ実Fileを取得し、Object URLを作る。
+   IndexedDBにはFile自体を保存しない。
+*/
+async function getPlayableLocalMusicFile(number) {
+  if (musicSource === 'github') return '';
 
-  for await (const entry of directoryHandle.values()) {
-    if (entry.kind === 'file') {
-      try {
-        const file = await entry.getFile();
-        if (isSupportedLocalMusicFile(file)) {
-          results.push({
-            file: file,
-            path: pathPrefix + file.name
-          });
-        }
-      } catch (error) {
-        console.log('音楽ファイル取得をスキップしました:', error);
-      }
-    }
-    else if (entry.kind === 'directory') {
-      const child =
-        await collectLocalMusicFiles(
-          entry,
-          pathPrefix + entry.name + '/'
-        );
-
-      results.push(...child);
-    }
+  if (musicFileMap.has(number)) {
+    return musicFileMap.get(number);
   }
 
-  return results;
-}
+  const table = sourceMusicTables[musicSource];
+  const handle = sourceDirectoryHandles[musicSource];
 
-async function loadLocalMusicFromDirectory(directoryHandle, source = musicSource) {
-  /*
-     まず「これから作り直すソース自身」の旧キャッシュだけを破棄する。
-     ここで現在アクティブな別ソースのObject URLをrevokeしてはいけない。
-     これが Local → External → Local で再生不能になる原因になる。
-  */
-  if (source === 'local' || source === 'extra') {
-    discardLocalMusicCache(source);
-  }
+  if (!table || !handle) return '';
 
-  /*
-     グローバル参照は単に空にするだけ。
-     Object URLのrevokeは上のdiscardLocalMusicCache()で
-     「読み直すソース自身」に対してだけ行っている。
-  */
-  musicFileMap = new Map();
-  musicFilesFound = new Set();
-  localMusicObjectUrls = [];
-  localMusicFiles = [];
-  musicCount = 0;
-  musicReady = false;
-  musicTitleCache.clear();
+  const record = table.records.get(number);
+  if (!record) return '';
 
-  const results =
-    await collectLocalMusicFiles(directoryHandle);
+  try {
+    const file = await getFileFromMusicPath(handle, record.path);
+    if (!file) return '';
 
-  results.sort(function(a, b) {
-    return a.path.localeCompare(b.path, 'ja', {
-      numeric: true,
-      sensitivity: 'base'
-    });
-  });
-
-  localMusicFiles = results.map(function(item) {
-    return item.file;
-  });
-
-  localMusicFiles.forEach(function(file, index) {
-    const number = index + 1;
     const url = URL.createObjectURL(file);
-
-    localMusicObjectUrls.push(url);
     musicFileMap.set(number, url);
-    musicFilesFound.add(number);
-  });
+    localMusicObjectUrls.push(url);
+    return url;
 
-  musicCount = localMusicFiles.length;
-  musicReady = true;
-  createMusicMenu();
+  } catch (error) {
+    console.log(`${getDisplayMusicId(record)} の実ファイル取得に失敗しました:`, error);
+    return '';
+  }
+}
 
-  if (source === 'local' || source === 'extra') {
-    captureLocalMusicCache(source);
+/*
+   Local / External Tableを読み込み、未完了ならバックグラウンドで再開する。
+*/
+const sourcePreparationPromises = {
+  local: null,
+  extra: null
+};
 
-    /*
-       現在選択中のソースとは別ソースのフォルダーをLong-tapで
-       変更した場合、ここで現在ソースのキャッシュへ戻す。
-       これにより「Localを操作中にExternalのフォルダーを変更したら
-       Localが再生不能になる」という状態を防ぐ。
-    */
-    if (source !== musicSource) {
-      if (!activateLocalMusicCache(musicSource)) {
-        musicFileMap = new Map();
-        musicFilesFound = new Set();
-        localMusicObjectUrls = [];
-        localMusicFiles = [];
-        musicCount = 0;
-        musicReady = false;
-      }
-    }
+/* 旧コードとの接続用。実体はFileキャッシュではなくTable復元完了を待つ。 */
+const musicTablesRestorePromise = directoryHandlesRestorePromise;
+
+async function prepareLocalMusicSourceInBackground(source) {
+  if (source !== 'local' && source !== 'extra') return false;
+
+  if (sourcePreparationPromises[source]) {
+    return sourcePreparationPromises[source];
   }
 
-  return musicCount;
+  sourcePreparationPromises[source] = (async function() {
+    try {
+      await directoryHandlesRestorePromise;
+
+      const handle = sourceDirectoryHandles[source];
+      if (!handle) return false;
+
+      /* まず保存済みTableを即時復元する。 */
+      await prepareLocalMusicSourceFromTable(source);
+
+      let meta = sourceMusicTables[source]
+        ? sourceMusicTables[source].meta
+        : null;
+
+      if (meta && meta.completed) {
+        return musicReady;
+      }
+
+      const permission = await handle.queryPermission({ mode: 'read' });
+      if (permission !== 'granted') {
+        return musicReady;
+      }
+
+      await scanMusicTableInBackground(source, handle);
+      buildSourceMusicStateFromTable(source);
+      return musicReady;
+
+    } catch (error) {
+      console.log(`${source} のバックグラウンド準備をスキップしました:`, error);
+      return false;
+
+    } finally {
+      sourcePreparationPromises[source] = null;
+    }
+  })();
+
+  return sourcePreparationPromises[source];
 }
 
 async function openSourceDirectoryPicker(source, options) {
@@ -1348,7 +1804,10 @@ async function chooseLocalMusicFolder(source, forcePicker = false, autoPlay = fa
       }
 
       selectedMusicFolderName = handle.name || '';
-      const count = await loadLocalMusicFromDirectory(handle, source);
+      await prepareLocalMusicSourceFromTable(source);
+      await scanMusicTableInBackground(source, handle);
+      buildSourceMusicStateFromTable(source);
+      const count = musicCount;
       if (count > 0) {
         currentMusic = currentMusicBySource[source] || getSavedMusicForSource(source);
         const sourceFilesFound =
@@ -1413,18 +1872,55 @@ async function chooseLocalMusicFolder(source, forcePicker = false, autoPlay = fa
       ? 'External側を含むフォルダーを選択してください<br>SDメモリの場合は「≡」からExternalを選択してください'
       : '音楽フォルダーを選択してください';
 
+    const isFolderChange = forcePicker && !!sourceDirectoryHandles[source];
+
     const directoryHandle = await openSourceDirectoryPicker(source, options);
     sourceDirectoryHandles[source] = directoryHandle;
     await saveDirectoryHandle(source, directoryHandle);
     selectedMusicFolderName = directoryHandle.name || '';
 
-    const count = await loadLocalMusicFromDirectory(directoryHandle, source);
+    /*
+       フォルダー選択時に、同じソースのバックグラウンド走査が
+       並行して動いている場合は、先にその完了を待つ。
+       走査処理はグローバルな musicFileMap / musicFilesFound / musicCount を
+       使用するため、旧フォルダーの走査と新フォルダーの走査を同時に行うと
+       「音楽ファイルが見つかりませんでした」と誤判定することがある。
+    */
+    if (sourcePreparationPromises[source]) {
+      await sourcePreparationPromises[source];
+    }
+
+    /* フォルダー変更時は、このソースの索引Tableだけを作り直す。 */
+    await deleteMusicTableFromDB(source);
+
+    await scanMusicTableInBackground(source, directoryHandle);
+    buildSourceMusicStateFromTable(source);
+    const count = musicCount;
     if (count === 0) {
       folderPickerMessage.innerHTML = `${sourceLabel(source)}で音楽ファイルが見つかりませんでした。<br>別のフォルダーを選択してください`;
       return false;
     }
 
-    currentMusic = currentMusicBySource[source] || getSavedMusicForSource(source);
+    /*
+       Long-tapによるフォルダー変更では、旧フォルダーの再生番号を引き継がない。
+       新しいフォルダーの先頭曲 Music-1 から開始する。
+       通常のソース切替えでは、この処理を行わない。
+    */
+    if (isFolderChange) {
+      currentMusic = 1;
+      saveMusicForSource(source, 1);
+
+      /* フォルダー変更前の音楽が再生中なら、旧フォルダーの曲を停止する。 */
+      if (source === musicSource) {
+        music.pause();
+        music.currentTime = 0;
+        music.src = '';
+        musicMode = 'none';
+      }
+    } else {
+      currentMusic = currentMusicBySource[source] || getSavedMusicForSource(source);
+    }
+
     const sourceFilesFound =
       source === musicSource
         ? musicFilesFound
@@ -1435,8 +1931,16 @@ async function chooseLocalMusicFolder(source, forcePicker = false, autoPlay = fa
     saveMusicForSource(source, currentMusic);
 
     if (source === activeSource) {
-      musicMode = 'none';
       hideFolderPickerDialog();
+
+      if (isFolderChange) {
+        /* 新フォルダーのMusic-1を直ちに再生する。 */
+        musicMode = 'all';
+        await playMusic(currentMusic, 'immediate');
+        return true;
+      }
+
+      musicMode = 'none';
 
       /*
          フォルダー選択後も即再生しない。
@@ -1541,7 +2045,7 @@ sourceLabels.forEach(function(label) {
 musicSourceSelector.addEventListener(
   'change',
   async function() {
-    await directoryHandlesRestorePromise;
+    await musicTablesRestorePromise;
 
     const nextSource = getSelectedMusicSource();
     if (nextSource === musicSource) return;
@@ -1576,7 +2080,7 @@ musicSourceSelector.addEventListener(
     }
 
     /*
-       Local / External は、まず個別キャッシュを切替える。
+       Local / External は、まず個別の索引Tableを切替える。
        通常のソース切替えではフォルダーを再走査しない。
     */
     if (activateLocalMusicCache(nextSource)) {
@@ -1590,13 +2094,24 @@ musicSourceSelector.addEventListener(
     }
 
     /*
-       キャッシュが無いソースへ切り替えた場合、
+       索引Tableが無いソースへ切り替えた場合、
        直前のソースのmusicFileMap/musicFilesFoundを絶対に残さない。
        残すと、Localへ切り替えた直後なのにGitHubのMusic-2～20等が
        プルダウンへ表示され、My MUSIC再生も旧ソースを参照してしまう。
     */
     clearActiveLocalMusicState();
     showInitialButton();
+
+    /*
+       Ver.11q：記憶Handleがあり、既にpermissionがgrantedなら
+       ソース選択直後からバックグラウンドでフォルダーを先行走査する。
+       promptの場合はここでは何も要求しないため、Chromeの権限確認は表示しない。
+       「My MUSIC再生」tap時には準備完了を利用し、未準備なら従来通り
+       ユーザー操作中にpermission確認を行う。
+    */
+    if (sourceDirectoryHandles[nextSource]) {
+      prepareLocalMusicSourceInBackground(nextSource);
+    }
 
     /*
        重要：ここではフォルダーHandleのpermissionを要求しない。
@@ -1655,7 +2170,21 @@ folderPickerCancel.addEventListener(
    ・手動選曲／Long-tap／左右フリック → 即タイトル
    ======================================== */
 
-const musicTitleCache = new Map();
+/*
+   音楽タイトルキャッシュ
+   GitHub / Local / External を完全分離する。
+   同じMusic-xx番号でも、ソースが違えば別タイトルとして保持する。
+*/
+const musicTitleCaches = {
+  github: new Map(),
+  local: new Map(),
+  extra: new Map()
+};
+
+function getMusicTitleCache(source = musicSource) {
+  return musicTitleCaches[source] || musicTitleCaches.github;
+}
+
 let musicTitleRequestId = 0;
 const musicTitleDisplayDelay = 5;
 
@@ -1877,8 +2406,10 @@ function readMusicTitleWithFileReader(blob) {
 }
 
 async function fetchMusicTitle(number) {
-  if (musicTitleCache.has(number)) {
-    return musicTitleCache.get(number);
+  const titleCache = getMusicTitleCache();
+
+  if (titleCache.has(number)) {
+    return titleCache.get(number);
   }
 
   let file = getMusicFile(number);
@@ -1908,7 +2439,7 @@ async function fetchMusicTitle(number) {
     const title = await readMusicTitleWithFileReader(blob);
 
     if (title) {
-      musicTitleCache.set(number, title);
+      titleCache.set(number, title);
     }
 
     return title;
@@ -1925,7 +2456,7 @@ function showMusicLongTapHint() {
 let musicTitleShownFor = 0;
 
 function showMusicTitle(title, allowScroll = true) {
-  const displayTitle = title || `Music-${currentMusic}`;
+  const displayTitle = title || getCurrentMusicDisplayLabel();
 
   // 音楽ボタンと同じ幅をタイトル表示窓にする
   const buttonWidth = musicButton.getBoundingClientRect().width;
@@ -1987,7 +2518,7 @@ function updateMusicTitleByTime() {
   */
   if (musicTitleShownFor === currentMusic) return;
 
-  const title = musicTitleCache.get(currentMusic);
+  const title = getMusicTitleCache().get(currentMusic);
   showMusicTitle(title || '');
   musicTitleShownFor = currentMusic;
 }
@@ -2129,7 +2660,7 @@ function probeMusicFile(file) {
 async function findMusicFile(number) {
 
   if (musicSource !== 'github') {
-    return musicFileMap.get(number) || '';
+    return await getPlayableLocalMusicFile(number);
   }
 
   if (githubMusicFileMap.has(number)) {
@@ -2340,13 +2871,13 @@ async function musicSwipeEnd(event) {
     saveCurrentMusic();
 
     music.src =
-      getMusicFile(currentMusic);
+      await findMusicFile(currentMusic);
 
     musicTitleShownFor = 0;
     musicTitleImmediate = true;
 
     const titleRequestId = ++musicTitleRequestId;
-    const cachedTitle = musicTitleCache.get(currentMusic);
+    const cachedTitle = getMusicTitleCache().get(currentMusic);
     if (cachedTitle !== undefined) {
       showMusicTitle(cachedTitle);
       musicTitleShownFor = currentMusic;
@@ -2464,13 +2995,13 @@ document.addEventListener('touchend', async function(event) {
   if (wasPaused) {
     currentMusic = nextMusic;
     saveCurrentMusic();
-    music.src = getMusicFile(currentMusic);
+    music.src = await findMusicFile(currentMusic);
 
     musicTitleShownFor = 0;
     musicTitleImmediate = true;
 
     const titleRequestId = ++musicTitleRequestId;
-    const cachedTitle = musicTitleCache.get(currentMusic);
+    const cachedTitle = getMusicTitleCache().get(currentMusic);
     if (cachedTitle !== undefined) {
       showMusicTitle(cachedTitle);
       musicTitleShownFor = currentMusic;
@@ -2574,13 +3105,13 @@ document.addEventListener('touchend', async function(event) {
   if (wasPaused) {
     currentMusic = nextMusic;
     saveCurrentMusic();
-    music.src = getMusicFile(currentMusic);
+    music.src = await findMusicFile(currentMusic);
 
     musicTitleShownFor = 0;
     musicTitleImmediate = true;
 
     const titleRequestId = ++musicTitleRequestId;
-    const cachedTitle = musicTitleCache.get(currentMusic);
+    const cachedTitle = getMusicTitleCache().get(currentMusic);
     if (cachedTitle !== undefined) {
       showMusicTitle(cachedTitle);
       musicTitleShownFor = currentMusic;
@@ -2607,13 +3138,26 @@ document.addEventListener('touchcancel', function() {
    再生中表示
    ======================================== */
 
+function getCurrentMusicDisplayLabel() {
+
+  if (musicSource === 'github') {
+    return `Music-${currentMusic}`;
+  }
+
+  const table = sourceMusicTables[musicSource];
+  const record = table ? table.records.get(currentMusic) : null;
+
+  return getDisplayMusicId(record) || `Music-${currentMusic}`;
+}
+
+
 function showPlayingButton() {
 
   musicHint.style.visibility =
     'visible';
 
   musicButton.innerHTML =
-    `Music-${currentMusic}<br>
+    `${getCurrentMusicDisplayLabel()}<br>
      <span class="music-pause">〓</span>`;
 
 }
@@ -2629,7 +3173,7 @@ function showPausedButton() {
     'visible';
 
   musicButton.innerHTML =
-    `Music-${currentMusic}<br>
+    `${getCurrentMusicDisplayLabel()}<br>
      <span class="music-play">▶</span>`;
 
 }
@@ -2694,11 +3238,10 @@ async function playMusic(number, titleDisplayMode = 'auto') {
   }
 
   /*
-     Local / Extra はフォルダー選択完了後のみ再生する。
+     Local / Externalでは、musicFileMapにURLがまだ無くても正常。
+     Tableに保存された相対パスから、ここで実Fileを取得する。
+     musicFileMapは再生済みFileのObject URLを保持するだけ。
   */
-  if (musicSource !== 'github' && !musicFileMap.has(number)) {
-    return;
-  }
 
   /*
      音楽再生時は動画を停止。
@@ -2759,7 +3302,45 @@ async function playMusic(number, titleDisplayMode = 'auto') {
     music.src = resolvedGitHubFile;
   }
   else {
-    music.src = getMusicFile(currentMusic);
+    /*
+       再起動後のLocal / Externalでは、IndexedDBから復元した
+       DirectoryHandleのpermissionが「prompt」に戻っている場合がある。
+
+       TableにはFile本体を保存していないため、再生時に実Fileを取得する前に
+       ユーザー操作中のrequestPermission()を行う。
+       これを後段で行うと、getPlayableLocalMusicFile()が先に失敗して
+       再生できない。
+    */
+    await directoryHandlesRestorePromise;
+
+    const handle = sourceDirectoryHandles[musicSource];
+    if (!handle) {
+      console.log('Local / Externalの記憶済みフォルダーがありません');
+      return;
+    }
+
+    try {
+      let permission = await handle.queryPermission({ mode: 'read' });
+
+      if (permission !== 'granted') {
+        permission = await handle.requestPermission({ mode: 'read' });
+      }
+
+      if (permission !== 'granted') {
+        console.log('Local / Externalの読み取り権限が取得できませんでした');
+        return;
+      }
+    } catch (error) {
+      console.log('Local / Externalの読み取り権限確認に失敗しました:', error);
+      return;
+    }
+
+    const localFile = await getPlayableLocalMusicFile(currentMusic);
+    if (!localFile) {
+      console.log('Local / External側の実ファイルを取得できません:', currentMusic);
+      return;
+    }
+    music.src = localFile;
   }
 
   /* タイトル取得は再生開始を待たせない */
@@ -2770,7 +3351,7 @@ async function playMusic(number, titleDisplayMode = 'auto') {
        キャッシュ済みなら即時に正式タイトルを表示。
        未取得ならタイトル取得完了時に即時表示する。
     */
-    const cachedTitle = musicTitleCache.get(currentMusic);
+    const cachedTitle = getMusicTitleCache().get(currentMusic);
     if (cachedTitle !== undefined) {
       showMusicTitle(cachedTitle);
       musicTitleShownFor = currentMusic;
@@ -2941,13 +3522,15 @@ musicButton.addEventListener(
        ラジオ切替え時に先回りして要求すると、
        Local / Externalを選ぶだけでpermission確認が表示される。
 
-       同一セッション中に既にキャッシュがある場合は、
+       同一セッション中に既に索引Tableがある場合は、
        permission要求もフォルダー再走査も行わない。
     */
     if (musicSource !== 'github') {
 
+      await musicTablesRestorePromise;
+
       /*
-         Local / Externalでは、現在ソースのキャッシュがアクティブでない限り
+         Local / Externalでは、現在ソースの索引Tableが読み込まれていない限り
          My MUSIC再生前に必ず記憶Handleから準備する。
          「musicFilesFoundに何か残っているか」だけでは判定しない。
       */
@@ -2958,11 +3541,37 @@ musicButton.addEventListener(
       if (!activeCacheReady) {
 
         /*
+           Ver.11q：保存済み索引Table復元後、ソース選択後に先行準備が進行中なら、まずその完了を待つ。
+           既にpermissionがgrantedなら、この待機中に走査が完了するため、
+           My MUSIC再生時の初回待ち時間を短縮できる。
+        */
+        if (sourcePreparationPromises[musicSource]) {
+          await sourcePreparationPromises[musicSource];
+        }
+
+        const preparedCache = sourceMusicCaches[musicSource];
+        if (preparedCache && preparedCache.ready && preparedCache.filesFound.size > 0) {
+          activateLocalMusicCache(musicSource);
+        }
+
+        const refreshedActiveCache = sourceMusicCaches[musicSource];
+        const refreshedReady =
+          !!(refreshedActiveCache && refreshedActiveCache.ready && refreshedActiveCache.filesFound.size > 0);
+
+        if (refreshedReady) {
+          currentMusic = currentMusicBySource[musicSource] || getSavedMusicForSource(musicSource);
+          if (!musicFilesFound.has(currentMusic)) {
+            currentMusic = Array.from(musicFilesFound).sort((a, b) => a - b)[0] || 1;
+          }
+          saveMusicForSource(musicSource, currentMusic);
+        }
+
+        /*
            記憶Handleがある場合だけ、ユーザー操作中に
            permission確認→フォルダー再読込みを行う。
            Pickerは開かない。
         */
-        if (sourceDirectoryHandles[musicSource]) {
+        if (!refreshedReady && sourceDirectoryHandles[musicSource]) {
           const prepared = await chooseLocalMusicFolder(
             musicSource,
             false,
@@ -2974,7 +3583,7 @@ musicButton.addEventListener(
             return;
           }
         }
-        else {
+        else if (!refreshedReady) {
           /*
              初回などHandleが無い場合。
              フォルダー選択はLong-tapに限定するため、
@@ -3141,8 +3750,15 @@ function createMusicMenu() {
     option.className =
       'musicOption';
 
+    const table = musicSource !== 'github'
+      ? sourceMusicTables[musicSource]
+      : null;
+    const record = table ? table.records.get(i) : null;
+
     option.textContent =
-      `Music-${i}`;
+      musicSource === 'github'
+        ? `Music-${i}`
+        : getDisplayMusicId(record);
 
     option.dataset.value =
       String(i);
@@ -3859,6 +4475,73 @@ video.addEventListener(
 
   }
 );
+
+
+/* ========================================
+   開発用 IndexedDB 完全初期化
+
+   ・走査中はボタン自体を無効化する。
+   ・停止中に実行するとDB全体を削除し、
+     handles / localTable / externalTable の両方を完全に初期化する。
+   ・削除完了後にページを再読込し、メモリ上の
+     フォルダー記憶／Local・Externalの索引Tableも同時に初期状態へ戻す。
+   ======================================== */
+const indexedDBResetButton =
+  document.getElementById('indexedDBResetButton');
+
+async function resetIndexedDBCompletely() {
+
+  if (musicScanInProgress > 0) {
+    alert('フォルダー走査中のため、IndexedDB完全初期化は実行できません。\n走査完了後にもう一度実行してください。');
+    return;
+  }
+
+  const confirmed = confirm(
+    'IndexedDBを完全初期化します。\n\n' +
+    'Local / External の選択フォルダー記憶と\n' +
+    '保存済み音楽索引Tableがすべて削除されます。\n\n' +
+    '実行しますか？'
+  );
+
+  if (!confirmed) return;
+
+  indexedDBResetButton.disabled = true;
+
+  try {
+    await new Promise(function(resolve, reject) {
+      const request =
+        indexedDB.deleteDatabase(directoryHandleDBName);
+
+      request.onsuccess = function() {
+        resolve();
+      };
+
+      request.onerror = function() {
+        reject(request.error);
+      };
+
+      request.onblocked = function() {
+        reject(new Error('IndexedDBの削除が別の処理によって保留されています。'));
+      };
+    });
+
+    alert('IndexedDBを完全初期化しました。\nページを再読み込みします。');
+    location.reload();
+
+  } catch (error) {
+
+    console.error('IndexedDB完全初期化に失敗しました:', error);
+    alert('IndexedDB完全初期化に失敗しました。\nコンソールを確認してください。');
+    updateIndexedDBResetButtonState();
+  }
+}
+
+indexedDBResetButton.addEventListener(
+  'click',
+  resetIndexedDBCompletely
+);
+
+updateIndexedDBResetButtonState();
 
 
 /* ========================================
