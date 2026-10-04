@@ -852,7 +852,7 @@
        ======================================== -->
 
   <button class="button" id="backButton">
-    戻　る》
+    戻　る
   </button>
 
 
@@ -2351,6 +2351,20 @@ function startSourceLongTap(source) {
 function cancelSourceLongTap() {
   clearTimeout(sourceLongTapTimer);
   sourceLongTapTimer = null;
+}
+
+/* ========================================
+   Ver.02s iPhone 音楽再生元 / DB初期化表示
+   iPhoneでは音楽再生元選択UIとDB初期化釦を表示しない。
+   Android / PCでは従来どおり表示する。
+   GitHubは内部的にDefaultのまま使用する。
+   ======================================== */
+const isIPhoneDevice = /iPhone/i.test(navigator.userAgent);
+
+if (isIPhoneDevice) {
+  musicSourceSelector.style.display = 'none';
+  musicSourceHint.style.display = 'none';
+  document.getElementById('indexedDBResetButton').style.display = 'none';
 }
 
 const sourceLabels =
