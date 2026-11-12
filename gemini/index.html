@@ -164,7 +164,7 @@
         <div id="snap-point"></div>
         
         <div id="header-container">
-            <span id="title-main">Circle timer - ver.04</span><br>
+            <span id="title-main">Circle timer - ver.04a</span><br>
             <span id="title-sub">《 by Ken.Ishida 》</span>
         </div>
 
@@ -482,15 +482,23 @@
                 };
             }
             [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
-                a.volume = 0;
+                // iPhoneでは volume=0 の直後に 1 へ戻すと、
+                // 実際の再生開始時には音が出てしまう場合があるため muted を使う。
+                a.muted = true;
                 const p = a.play();
-                if(p){
+                if(p && typeof p.then === 'function'){
                     p.then(()=>{
                         a.pause();
                         a.currentTime = 0;
-                    }).catch(()=>{});
+                        a.muted = false;
+                    }).catch(()=>{
+                        a.muted = false;
+                    });
+                } else {
+                    a.pause();
+                    a.currentTime = 0;
+                    a.muted = false;
                 }
-                a.volume = 1;
             });
             audioUnlocked = true;
         }
