@@ -519,12 +519,14 @@
             if (!voiceStartChimePending) return;
             voiceStartChimePending = false;
             if (voiceStartChimeFallback) { clearTimeout(voiceStartChimeFallback); voiceStartChimeFallback = null; }
-            setTimeout(async () => {
-                try {
-                    if (audioCtx.state !== 'running') await audioCtx.resume();
-                    if (audioCtx.state === 'running') playChime();
-                } catch(e) {}
-            }, 700);
+            setTimeout(() => retryVoiceStartChime(0), 700);
+        }
+        async function retryVoiceStartChime(attempt) {
+            try {
+                if (audioCtx.state !== 'running') await audioCtx.resume();
+                if (audioCtx.state === 'running') { playChime(); return; }
+            } catch(e) {}
+            if (attempt < 3) setTimeout(() => retryVoiceStartChime(attempt + 1), 150);
         }
         
         let clockHelpTimer = null;
