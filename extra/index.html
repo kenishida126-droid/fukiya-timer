@@ -1,355 +1,859 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Arrows timer</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>スポーツ吹矢タイマー Gemini version</title>
+    <style>
+        html, body {
+            background-color: #000;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            -webkit-user-select: none;
+            -webkit-touch-callout: none;
+            user-select: none;
+            -webkit-tap-highlight-color: transparent;
+        }
 
-<style>
-html, body {
-  background-color: #000;
-  color: #fff;
-  text-align: center;
-  margin: 0;
-  padding: 0;
-  width: 100%;
-  -webkit-user-select: none;
-  user-select: none;
-  /* ===== tap highlight除去 ===== */
-  -webkit-tap-highlight-color: transparent;
-}
+        html {
+            min-height: calc(100vh + 600px);
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
 
-html {
-  /* 固定した画面の下に、ブラウザバーを隠すためのページスクロール量を確保 */
-  min-height: calc(100vh + 600px);
-  overflow-x: hidden;
-  overflow-y: auto;
-}
+        body {
+            min-height: calc(100vh + 600px);
+            overflow: visible;
+        }
 
-body {
-  min-height: 100vh;
-  overflow: visible;
-}
+        #main-wrapper {
+            position: sticky;
+            top: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-height: 101vh;
+            width: 100%;
+        }
 
-#main-wrapper {
-  position: fixed;
-  top: 0;
-  left: 0;
-  z-index: 1;
-  min-height: 101vh;
-  width: 100%;
-}
+        /* インストール済みPWAでは、画面全体を表示領域の上端に固定する */
+        @media (display-mode: standalone) {
+            #main-wrapper {
+                position: fixed;
+                top: 0;
+                left: 0;
+                z-index: 1;
+            }
+        }
 
-/* ===== タイトル ===== */
-#title { margin-top: 30px; line-height: 1.2; }
-  #title-main { display: inline-block; font-size: 8.8vw; font-weight: bold; line-height: 1.1; transform: scaleX(0.9); }
-  #title-sign { display: block; font-family: sans-serif; font-size: 7vw; opacity: 0.9; margin-top: 1.0vh; }
+        #snap-point {
+            scroll-snap-align: start;
+            height: 2vh;
+            width: 100%;
+        }
 
-/* ===== タイマー ===== */
-#timer {
-  margin: 5vh 0;
-  font-size: 40vw;
-  font-weight: bold;
-  line-height: 1;
-  transform: scaleY(1.3);
-  cursor: pointer;
-}
+        #header-container {
+            width: 100%;
+            text-align: center;
+            flex-shrink: 0;
+        }
+        #title-main { display: inline-block; font-size: 9.0vw; font-weight: bold; line-height: 1.1; transform: scaleX(0.9); }
+        #title-sub { display: block; font-family: sans-serif; font-size: 7vw; opacity: 0.9; margin-top: -0.5vh; }
 
-.timer-lime { color:#00ff00; }
-.timer-gold { color:#d4af37; }
-.timer-red  { color:#ff0000; }
+        #timer-display {
+            flex-shrink: 0;
+            width: 100%;
+            text-align: center;
+            font-variant-numeric: tabular-nums;
+            font-weight: 900;
+            font-size: 35vw;
+            line-height: 0.75;
+            transform: scale(1.22, 1.5);
+            transform-origin: center;
+            margin-top: 5vh; 
+            margin-bottom: 0;
+            color: lime;
+            cursor: pointer;
+        }
 
-.blink-slow { animation: blinkSlow 1s steps(1) infinite; }
-@keyframes blinkSlow { 50% { opacity:0; } }
+        #circle-timer-container {
+            flex-shrink: 0;
+            width: 92vw;
+            height: 92vw;
+            margin-top: 8.5vh; 
+            margin-bottom: 5vh;
+            position: relative;
+        }
 
-.blink-fast { animation: blinkFast 0.3s steps(1) infinite; }
-@keyframes blinkFast { 50% { opacity:0; } }
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .outline { fill: none; stroke: #fff; stroke-width: 1; }
 
-/* ===== Shot Pace ===== */
-#shotpace { position: relative; width: 100vw; cursor: pointer; }
+        #analog-clock { pointer-events: none; }
+        .clock-tick { stroke: #fff; stroke-width: 1.25; stroke-linecap: round; opacity: 0.78; }
+        .clock-tick.major { stroke-width: 1.8; opacity: 0.9; }
+        .clock-help { fill: gold; stroke: #000; stroke-width: 1.4; paint-order: stroke; font-size: 9.6px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+        .clock-numeral { fill: #fff; stroke: #000; stroke-width: 2; paint-order: stroke; font-size: 13px; font-weight: 700; text-anchor: middle; dominant-baseline: middle; }
+        .clock-hand-outline { stroke: #000; stroke-linecap: round; opacity: 0.55; }
+        .clock-hand { stroke: #fff; stroke-linecap: round; opacity: 0.82; }
+.clock-hand-second-outline { stroke: #000; stroke-linecap: round; opacity: 0.55; }
+.clock-hand-second { stroke: red; stroke-linecap: round; opacity: 0.92; }
 
-#arrows {
-  display: grid;
-  grid-template-columns: repeat(5, 1fr);
-}
+        #mic-button {
+            position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+            width: 28%; height: 28%; padding: 0; border: 0.92vw solid #fff; border-radius: 50%;
+            background: #000; color: #fff; display: flex; align-items: center; justify-content: center;
+            cursor: pointer; z-index: 1; -webkit-tap-highlight-color: transparent;
+        }
+        #mic-button.mic-active { color: #f00; }
+        #mic-button.mic-running .microphone { animation: none; opacity: 1; }
+        @keyframes mic-blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.2; } }
+        .mic-holder { display: block; position: relative; width: 1.2em; height: 1.6em; font-size: 11.96vw; }
+        .microphone {
+            display: block; color: #fff; font-size: 11.96vw; position: relative; left: 0.3em;
+            width: 0.6em; height: 1.1em; background-color: currentColor; border-radius: 0.3em;
+        }
+        #mic-button.mic-active .microphone { color: #f00; animation: mic-blink 1.2s infinite ease-in-out; }
+        #mic-button.mic-active.mic-running .microphone { color: #f00; animation: none; opacity: 1; }
+        .microphone::before {
+            content: ""; position: absolute; top: 0.5em; left: -0.2em; width: 0.8em; height: 0.7em;
+            border-left: 0.1em solid currentColor; border-right: 0.1em solid currentColor;
+            border-bottom: 0.1em solid currentColor; border-radius: 0 0 0.5em 0.5em;
+        }
+        .microphone::after {
+            content: ""; position: absolute; top: 0; left: 0; width: 1.6em; height: 1.6em;
+            background: linear-gradient(to bottom, currentColor 0%, currentColor 100%) 0.25em 1.2em,
+                        linear-gradient(to bottom, currentColor 0%, currentColor 100%) 0 1.5em;
+            background-size: 0.1em 0.4em, 0.6em 0.1em; background-repeat: no-repeat;
+        }.blink { animation: sharp-blink-op 0.7s steps(1) infinite; }
+        .blink-fast { animation: sharp-blink-op 0.3s steps(1) infinite; }
+        @keyframes sharp-blink-op { 50% { opacity: 0; } }
 
-/* ===== 矢 ===== */
-.arrow {
-  position: relative;
-  margin: auto;
-  width: 46px;
-  height: 210px;
-  clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
-  background:
-    linear-gradient(
-      90deg,
-      #8b0000 0%,
-      #b30000 35%,
-      #ff6a6a 55%,
-      #b30000 70%,
-      #7a0000 100%
-    );
-}
+        @keyframes rainbow-wave {
+            0% { filter: brightness(0.5); }
+            50% { filter: brightness(1.8) drop-shadow(0 0 10px white); }
+            100% { filter: brightness(0.5); }
+        }
+        .wave-active path {
+            animation: rainbow-wave 2s ease-in-out infinite;
+        }
+        .wave-active path:nth-child(1) { animation-delay: 0.0s; }
+        .wave-active path:nth-child(2) { animation-delay: 0.2s; }
+        .wave-active path:nth-child(3) { animation-delay: 0.4s; }
+        .wave-active path:nth-child(4) { animation-delay: 0.6s; }
+        .wave-active path:nth-child(5) { animation-delay: 0.8s; }
 
-.arrow::after {
-  content: "";
-  position: absolute;
-  bottom: -2px;
-  left: 4px;
-  width: 38px;
-  height: 10px;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(255,255,255,0.35) 0%,
-    rgba(120,0,0,0.9) 70%
-  );
-  border-radius: 50%;
-}
-
-.blink { animation: arrowBlink 1s step-start infinite; }
-@keyframes arrowBlink { 50% { opacity:0; } }
-
-#label {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 26px;
-  color: #00ff00;
-  pointer-events: none;
-}
-/* Extra：Android Chrome用 アドレスバー退避余白 */
-.extra-bottom-spacer {
-  height: 600px;
-}
-</style>
+        /* ★ メトロノーム */
+        #metronome, .metro-note { fill: white; cursor: pointer; }
+        @keyframes metro-blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
+        .on-red { fill: red !important; animation: metro-blink 1s infinite; }
+        .on-yellow { fill: yellow !important; animation: metro-blink 1s infinite; }
+        .on-lime { fill: lime !important; animation: metro-blink 1s infinite; }
+        .on-aqua { fill: aqua !important; animation: metro-blink 1s infinite; }
+        @keyframes metro-blink { 0%{opacity:1;} 50%{opacity:0.2;} 100%{opacity:1;} }
+        .metro-on { fill: red !important; animation: metro-blink 1s infinite; }
+    </style>
 </head>
-
 <body>
+    <div id="main-wrapper">
+        <div id="snap-point"></div>
+        
+        <div id="header-container">
+            <span id="title-main">Circle timer - ver.04a</span><br>
+            <span id="title-sub">《 by Ken.Ishida 》</span>
+        </div>
 
-<div id="main-wrapper">
-<div id="title">
-  <div id="title-main">Arrows timer - ver.03a</div>
-  <div id="title-sign">《 by Ken.Ishida 》</div>
-</div>
+        <div id="timer-display" onclick="handleTap()">03:05</div>
 
-<div id="timer" class="timer-lime">3:05</div>
+        <div id="circle-timer-container">
+            <svg viewBox="0 0 200 200">
+                
 
-<div id="shotpace">
-  <div id="arrows">
-    <div class="arrow"></div><div class="arrow"></div>
-    <div class="arrow"></div><div class="arrow"></div>
-    <div class="arrow"></div>
-  </div>
-  <div id="label">Shot Pace – Arrows</div>
-</div>
-</div>
+                <g id="pie-segments"></g>
+                <path id="mask-path" fill="#000" />
+                <g id="analog-clock" pointer-events="none">
+                    <g id="clock-ticks"></g>
+                    <g id="clock-numerals" class="clock-numeral">
+                        <text x="100" y="20">Ⅻ</text>
+                        <text x="140" y="31">Ⅰ</text>
+                        <text x="169" y="60">Ⅱ</text>
+                        <text x="180" y="100">Ⅲ</text>
+                        <text x="169" y="140">Ⅳ</text>
+                        <text x="140" y="169">Ⅴ</text>
+                        <text x="100" y="180">Ⅵ</text>
+                        <text x="60" y="169">Ⅶ</text>
+                        <text x="31" y="140">Ⅷ</text>
+                        <text x="20" y="100">Ⅸ</text>
+                        <text x="31" y="60">Ⅹ</text>
+                        <text x="60" y="31">Ⅺ</text>
+                    </g>
+                    <g id="hour-hand"><line class="clock-hand-outline" x1="100" y1="100" x2="100" y2="43" stroke-width="6"/><line class="clock-hand" x1="100" y1="100" x2="100" y2="43" stroke-width="5"/></g>
+                    <g id="minute-hand"><line class="clock-hand-outline" x1="100" y1="100" x2="100" y2="27" stroke-width="5"/><line class="clock-hand" x1="100" y1="100" x2="100" y2="27" stroke-width="2.8"/></g>
+                    <g id="second-hand"><line class="clock-hand-second-outline" x1="100" y1="100" x2="100" y2="17" stroke-width="1.8"/><line class="clock-hand-second" x1="100" y1="100" x2="100" y2="17" stroke-width="1.0"/></g>
+                </g>
+                <g id="clock-help" class="clock-help" pointer-events="none">
+                    <text x="100" y="148">アナログ時計の OFF/ON は</text>
+                    <text x="100" y="162">文字盤を tap</text>
+                </g>
+                <circle class="outline" cx="100" cy="100" r="98" />
+                
+<!-- ① beep1(2時の位置) -->
+<text id="note1" class="metro-note" x="190" y="20" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(1)">♬</text>
+<!-- ② beep2(4時の位置) -->
+<text id="note2" class="metro-note" x="190" y="182" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(2)">♫</text>
+<!-- ③ beep3(7時の位置) -->
+<text id="note3" class="metro-note" x="15" y="182" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(3)">♪</text>
+<!-- ④ beep4(10時の位置) -->
+<text id="note4" class="metro-note" x="15" y="20" font-size="25" text-anchor="middle" dominant-baseline="middle" onclick="event.stopPropagation(); toggleMetro(4)">♩</text>
 
-<script>
-/* ===== 定数 ===== */
-const TOTAL = 185;
-const READY = 180;
+            </svg>
+            <button id="mic-button" type="button" aria-label="マイク切替" onclick="toggleMic(event)">
+                <span class="mic-holder"><span class="microphone"></span></span>
+            </button>
+        </div>
+    </div>
 
-/* ===== 状態 ===== */
-let time = TOTAL;
-let running = false;
-let intervalId = null;
-let shotPace = false;
-let prevIndex = -1;
+    <script>
+        let timeLeft = 185, timerInterval = null, isRunning = false, wakeLock = null, isMicEnabled = false, recognition = null;
+        const display = document.getElementById('timer-display'), micButton = document.getElementById('mic-button');
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
-/* ===== WakeLock ===== */
-let wakeLock = null;
-async function requestWakeLock() {
-  try {
-    if ('wakeLock' in navigator) {
-      wakeLock = await navigator.wakeLock.request('screen');
+        document.addEventListener(
+            'touchstart',
+            async () => {
+                if (audioCtx.state !== 'running') {
+                    try {
+                        await audioCtx.resume();
+                    } catch(e){}
+                }
+            },
+            { once:true }
+        );
+
+        // ★ メトロノーム
+        // ★ メトロノーム（4種・排他）
+        let currentMetro = 0;
+        let metroTimer = null;
+
+        function clearMetro(){
+            [1,2,3,4].forEach(i=>{
+                const el = document.getElementById('note'+i);
+                if(el) el.classList.remove('on-red','on-yellow','on-lime','on-aqua');
+            });
+            if(metroTimer){ clearInterval(metroTimer); metroTimer = null; }
+            currentMetro = 0;
+        }
+
+        async function toggleMetro(n){
+            try{
+                if(audioCtx.state !== 'running'){
+                    await audioCtx.resume();
+                }
+            }catch(e){}
+            unlockAudio();
+            if(currentMetro === n){
+                clearMetro();
+                return;
+            }
+
+            if(currentMetro === n){
+                clearMetro();
+                return;
+            }
+
+            clearMetro();
+            currentMetro = n;
+
+            const el = document.getElementById('note'+n);
+            if(!el) return;
+
+            if(n===1) el.classList.add('on-red');
+            if(n===2) el.classList.add('on-yellow');
+            if(n===3) el.classList.add('on-lime');
+            if(n===4) el.classList.add('on-aqua');
+
+            // 初回は即鳴らす
+            if(n===1) beep1();
+            else if(n===2) beep2();
+            else if(n===3) beep3();
+            else if(n===4) beep4();
+
+            metroTimer = setInterval(function(){
+                if(n===1) beep1();
+                else if(n===2) beep2();
+                else if(n===3) beep3();
+                else if(n===4) beep4();
+            },1000);
+        }
+
+        // ① beep音（トライアングル音もどき）
+        function beep1(){
+         const osc = audioCtx.createOscillator();
+         const gainNode = audioCtx.createGain();
+
+         // 1. サイン波または三角波（トライアングルの音に近い）
+         osc.type = 'triangle';
+         // 2. 高い周波数を設定
+         osc.frequency.value = 3000; 
+
+         // 3. エンベロープの設定（急なアタックと減衰）
+         const now = audioCtx.currentTime;
+         gainNode.gain.setValueAtTime(0, now);
+         gainNode.gain.linearRampToValueAtTime(0.4, now + 0.01); // アタック（急）
+         gainNode.gain.exponentialRampToValueAtTime(0.01, now + 0.8); // 減衰（長め）
+
+         // ノードの接続
+         osc.connect(gainNode);
+         gainNode.connect(audioCtx.destination);
+
+         // 再生と停止
+         osc.start();
+         osc.stop(audioCtx.currentTime + 0.8);
+        }
+
+
+        // ② 指定音（音量調整済）
+        function beep2(){
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "sine";
+            osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + 0.6);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.6);
+        }
+
+        // ③ Real Metronome音（改良版：クリック＋アタック）
+        function beep3(){
+            const now = audioCtx.currentTime;
+
+            // --- 高音クリック（芯） ---
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(2000, now);
+            gain.gain.setValueAtTime(0.7, now);
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start(now);
+            osc.stop(now + 0.03);
+
+            // --- ノイズクリック（リアル感） ---
+            const bufferSize = audioCtx.sampleRate * 0.02; // 20ms
+            const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+            const data = buffer.getChannelData(0);
+            for (let i = 0; i < bufferSize; i++) {
+                data[i] = (Math.random() * 2 - 1) * 0.5;
+            }
+
+            const noise = audioCtx.createBufferSource();
+            noise.buffer = buffer;
+
+            const noiseGain = audioCtx.createGain();
+            noiseGain.gain.setValueAtTime(0.4, now);
+            noiseGain.gain.exponentialRampToValueAtTime(0.001, now + 0.02);
+
+            noise.connect(noiseGain);
+            noiseGain.connect(audioCtx.destination);
+
+            noise.start(now);
+        }
+
+        // ④ ピーン音 2100Hz
+        function beep4(){
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = "square";
+            osc.frequency.setValueAtTime(2100, audioCtx.currentTime);
+            gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.8);
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.8);
+        }
+        
+
+        async function playTapSound() {
+            try{
+                if(audioCtx.state !== 'running'){
+                    await audioCtx.resume();
+                }
+            }catch(e){}
+            unlockAudio();
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sine';
+            osc.frequency.setValueAtTime(
+                880,
+                audioCtx.currentTime
+            );
+            gain.gain.setValueAtTime(
+                0.1,
+                audioCtx.currentTime
+            );
+            gain.gain.exponentialRampToValueAtTime(
+                0.01,
+                audioCtx.currentTime + 0.1
+            );
+            osc.connect(gain);
+            gain.connect(audioCtx.destination);
+            osc.start();
+            osc.stop(audioCtx.currentTime + 0.1);
+        }
+
+        async function updateWakeLock() {
+            if (!('wakeLock' in navigator)) return;
+            const shouldBeActive = isMicEnabled || isRunning;
+            if (shouldBeActive && wakeLock === null) {
+                try {
+                    wakeLock = await navigator.wakeLock.request('screen');
+                    wakeLock.addEventListener('release', () => { wakeLock = null; });
+                } catch (err) {}
+            } else if (!shouldBeActive && wakeLock !== null) {
+                try {
+                    await wakeLock.release();
+                    wakeLock = null;
+                } catch (err) {}
+            }
+        }
+
+        function updateMicVisual() {
+            if (!isMicEnabled) { micButton.classList.remove('mic-active', 'mic-running'); return; }
+            micButton.classList.add('mic-active');
+            if (isRunning) { micButton.classList.add('mic-running'); }
+            else { micButton.classList.remove('mic-running'); }
+        }
+
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+            recognition = new SpeechRecognition();
+            recognition.lang = 'ja-JP';
+            recognition.continuous = true;
+            recognition.interimResults = true;
+
+            recognition.onresult = (event) => {
+                let transcript = "";
+                for (let i = event.resultIndex; i < event.results.length; i++) {
+                    transcript += event.results[i][0].transcript;
+                }
+                transcript = transcript.toLowerCase().trim();
+                if (!isRunning && (timeLeft === 185 || timeLeft === 0)) {
+                    if (/(開始|かいし|カイシ|スタート|すたーと|start|始め|はじめ|ハジメ)/.test(transcript)) {
+                        if (timeLeft === 0) resetTimer();
+                        startTimer();
+                    }
+                }
+            };
+            recognition.onstart = () => { updateMicVisual(); updateWakeLock(); };
+            recognition.onend = () => { if (isMicEnabled && !isRunning) recognition.start(); updateMicVisual(); updateWakeLock(); };
+            recognition.onerror = () => { if (isMicEnabled) setTimeout(() => recognition.start(), 300); };
+        }
+
+        function toggleMic(event) {
+            event.stopPropagation();
+            playTapSound();
+            if (!recognition) return;
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            isMicEnabled = !isMicEnabled;
+            if (isMicEnabled) { try { recognition.start(); } catch(e) {} } else { recognition.stop(); }
+            updateMicVisual();
+            updateWakeLock();
+        }
+
+        let audioFiles = null;
+        let audioUnlocked = false;
+        function unlockAudio(){
+            if(audioUnlocked) return;
+            if(!audioFiles){
+                audioFiles = {
+                    start: new Audio('start-0.mp3'),
+                    halfMin: new Audio('30sec.mp3'),
+                    end: new Audio('end.mp3')
+                };
+            }
+            // 音声ファイルの先行再生は行わない（初回tap時の追加音を防止）。
+            audioUnlocked = true;
+        }
+        function safePlay(a) {
+            return new Promise(resolve => {
+                let finished = false;
+                const finish = () => {
+                    if (finished) return;
+                    finished = true;
+                    a.removeEventListener('ended', finish);
+                    a.removeEventListener('error', finish);
+                    a.removeEventListener('abort', finish);
+                    resolve();
+                };
+                try {
+                    a.pause();
+                    a.currentTime = 0;
+                    a.addEventListener('ended', finish, { once: true });
+                    a.addEventListener('error', finish, { once: true });
+                    a.addEventListener('abort', finish, { once: true });
+                    const playback = a.play();
+                    if (playback && typeof playback.catch === 'function') playback.catch(finish);
+                } catch (e) {
+                    finish();
+                }
+            });
+        }
+        function playChime() { const now = audioCtx.currentTime; const p = (f, s, d) => { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(f, s); g.gain.setValueAtTime(0.5, s); g.gain.exponentialRampToValueAtTime(0.01, s + d); o.connect(g); g.connect(audioCtx.destination); o.start(s); o.stop(s + d); }; p(659.25, now, 0.8); p(523.25, now + 0.4, 1.2); }
+        
+        let clockHelpTimer = null;
+        function hideClockHelp() {
+            const help = document.getElementById('clock-help');
+            if (help) help.style.display = 'none';
+            if (clockHelpTimer) clearTimeout(clockHelpTimer);
+        }
+        let analogClockVisible = true;
+        function toggleAnalogClock() {
+            hideClockHelp();
+            analogClockVisible = !analogClockVisible;
+            document.getElementById('analog-clock').style.display = analogClockVisible ? '' : 'none';
+        }
+        function initAnalogClock() {
+            const ticks = document.getElementById('clock-ticks');
+            for (let i = 0; i < 12; i++) {
+                const tick = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+                tick.setAttribute('x1', '100');
+                tick.setAttribute('y1', '4');
+                tick.setAttribute('x2', '100');
+                tick.setAttribute('y2', i % 3 === 0 ? '14' : '10');
+                tick.setAttribute('transform', `rotate(${i * 30} 100 100)`);
+                tick.setAttribute('class', i % 3 === 0 ? 'clock-tick major' : 'clock-tick');
+                ticks.appendChild(tick);
+            }
+            updateAnalogClock();
+            setInterval(updateAnalogClock, 1000);
+        }
+
+        function updateAnalogClock() {
+            const now = new Date();
+            const seconds = now.getSeconds();
+            const minutes = now.getMinutes() + seconds / 60;
+            const hours = (now.getHours() % 12) + minutes / 60;
+            document.getElementById('hour-hand').setAttribute('transform', `rotate(${hours * 30} 100 100)`);
+            document.getElementById('minute-hand').setAttribute('transform', `rotate(${minutes * 6} 100 100)`);
+            document.getElementById('second-hand').setAttribute('transform', `rotate(${seconds * 6} 100 100)`);
+        }
+        function updateDisplay() {
+            let m = Math.floor(timeLeft / 60), s = timeLeft % 60;
+            display.innerText = m + ":" + s.toString().padStart(2, '0');
+            display.classList.remove('blink', 'blink-fast');
+            const pieSegments = document.getElementById('pie-segments');
+            const maskPath = document.getElementById('mask-path');
+
+            if (timeLeft > 180 || timeLeft === 0) {
+                display.style.color = "lime";
+                if (timeLeft === 0) display.classList.add('blink-fast');
+                maskPath.setAttribute("d", ""); 
+                pieSegments.classList.add('wave-active');
+            } else {
+                display.style.color = (timeLeft > 30) ? "gold" : "red";
+                if (timeLeft <= 30) display.classList.add('blink');
+                pieSegments.classList.remove('wave-active');
+
+                const startAngle = -90;
+                const angle = ((180 - Math.max(0, timeLeft)) / 180) * 360;
+                maskPath.setAttribute("d", angle <= 0 ? "" : getPathData(startAngle, startAngle + Math.min(angle, 359.9)));
+            }
+            
+            if ([141, 107, 73, 39].includes(timeLeft)) playChime();
+            if (timeLeft === 181 && audioFiles) safePlay(audioFiles.start);
+            if (timeLeft === 30 && audioFiles) safePlay(audioFiles.halfMin);
+            if (timeLeft === 0) {
+                let endPlayback = Promise.resolve();
+                if (audioFiles) endPlayback = safePlay(audioFiles.end);
+                clearInterval(timerInterval); isRunning = false;
+                updateWakeLock();
+                if (isMicEnabled) {
+                    endPlayback.then(() => {
+                        if (!isRunning && isMicEnabled) {
+                            try { recognition.start(); } catch (e) {}
+                            updateMicVisual();
+                        }
+                    });
+                }
+                updateMicVisual();
+            }
+        }
+
+        function getPathData(s, e) {
+            const r = Math.PI / 180;
+            return "M 100 100 L "
+              + (100 + 98 * Math.cos(s * r)) + " "
+              + (100 + 98 * Math.sin(s * r))
+              + " A 98 98 0 "
+              + (e - s <= 180 ? 0 : 1) + " 1 "
+              + (100 + 98 * Math.cos(e * r)) + " "
+              + (100 + 98 * Math.sin(e * r)) + " Z";
+        }
+
+        function initPie() { 
+            const pie = document.getElementById('pie-segments'); pie.innerHTML = ''; let ang = -90;
+            [{sec:39,c:'lime'},{sec:34,c:'purple'},{sec:34,c:'Blue'},{sec:34,c:'yellow'},{sec:39,c:'red'}].forEach(a => {
+                const d = (a.sec/180)*360; const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                p.setAttribute("d", getPathData(ang, ang + d)); p.setAttribute("fill", a.c); pie.appendChild(p); ang += d;
+            });
+        }
+
+        function handleTap() {
+            hideClockHelp(); 
+            unlockAudio();
+            playTapSound();
+            if (isRunning || timeLeft === 0) resetTimer(); else startTimer(); 
+        }
+
+        async function startTimer() { 
+            if (isRunning) return; 
+
+            // ★ 音声起動時も確実にAudio解放
+            unlockAudio();
+            if (audioCtx.state === 'suspended') {
+                try { await audioCtx.resume(); } catch(e){}
+            }
+
+            isRunning = true; 
+            if (isMicEnabled) { try { recognition.stop(); } catch(e){} } 
+            updateMicVisual();
+            updateWakeLock(); 
+            timerInterval = setInterval(() => { 
+                if (timeLeft > 0) { 
+                    timeLeft--; 
+                    updateDisplay(); 
+                } 
+            }, 1000); 
+            updateMicVisual(); 
+        }
+
+        function resetTimer() { 
+            clearInterval(timerInterval); isRunning = false; timeLeft = 185; 
+            if (isMicEnabled) { try { recognition.start(); } catch(e){} } 
+            initPie(); 
+            updateDisplay();
+            updateMicVisual(); 
+            updateWakeLock(); 
+        }
+
+        initPie();
+        initAnalogClock();
+        document.querySelector('#circle-timer-container svg').addEventListener('click', toggleAnalogClock);
+        clockHelpTimer = setTimeout(hideClockHelp, 10000); 
+        updateDisplay();
+    
+    /* === 虹色リニアモーターカー（2秒/周・出入庫完全対称版） === */
+(function(){
+  const svg = document.querySelector("#circle-timer-container svg");
+  if(!svg) return;
+
+  const NS = "http://www.w3.org/2000/svg";
+  const cx = 100, cy = 100;
+
+  const old = svg.querySelector("#linear-train");
+  if(old) old.remove();
+
+  const outline = svg.querySelector(".outline");
+  const tubeWidth = 6;
+  const tubeRadius = 98 - tubeWidth/2;
+  outline.setAttribute("r", tubeRadius);
+  outline.style.strokeWidth = tubeWidth;
+
+  const R = tubeRadius;
+  const totalDeg = 60;
+  const cars = 7;
+  const carDeg = totalDeg / cars;
+
+  const baseColors = [
+    "#ff0000","#ff7f00","#ffff00",
+    "#00ff00","#00aaff","#0000ff","#8b00ff"
+  ];
+
+/* === 虹色リニアモーターカー  周回速度 === */
+/* === const degPerSec = 20;  //18秒/周 === */
+/* === const degPerSec = 60;  // 6秒/周 === */
+/* === const degPerSec = 180; // 2秒/周 === */
+  const degPerSec = 180; // 2秒/周
+
+  let animId = null;
+  let trainStartTime = null;
+  let stopStartTime = null;
+  let stopping = false;
+  let colorShift = 0;
+  let elapsedAtStop = 0; // 入庫開始時の経過秒
+
+  const group = document.createElementNS(NS,"g");
+  group.setAttribute("id","linear-train");
+  group.style.display = "none";
+  svg.appendChild(group);
+
+  function polar(angle){
+    const rad = (angle-90)*Math.PI/180;
+    return {
+      x: cx + R*Math.cos(rad),
+      y: cy + R*Math.sin(rad)
+    };
+  }
+
+  function draw(now){
+    group.innerHTML = "";
+    if(!trainStartTime) return;
+
+    const elapsed = (now - trainStartTime)/1000;
+    let totalElapsed = elapsed;
+    if(stopping){
+      const stopElapsed = (now - stopStartTime)/1000;
+      totalElapsed = elapsedAtStop + stopElapsed; // 出庫の続きとして回転
     }
-  } catch {}
-}
-function releaseWakeLock() {
-  if (wakeLock) {
-    wakeLock.release().catch(()=>{});
-    wakeLock = null;
+    const rotation = 0 + totalElapsed * degPerSec;
+    const passedDeg = totalElapsed * degPerSec;
+
+    const laps = Math.floor(passedDeg / 360);
+    colorShift = laps % cars;
+
+    let visibleCars;
+
+    let headShift = 0; // 先頭を何両分進めるか
+
+    // 出庫：開始からの進行角で増加（最大7両）
+    if(!stopping){
+      const carsOut = Math.floor(passedDeg / carDeg) + 1;
+      visibleCars = Math.min(cars, carsOut);
+    }
+    // 入庫：12時通過ごとに「先頭車両を消す」＝先頭を前に送る
+    else{
+      const stopElapsed = (now - stopStartTime)/1000;
+      const stopDeg = stopElapsed * degPerSec;
+      const carsIn = Math.floor(stopDeg / carDeg) + 1;
+      const hidden = Math.min(cars, carsIn);
+
+      headShift = hidden;              // 先頭をhidden両分進める
+      visibleCars = Math.max(0, cars - hidden);
+    }
+
+    for(let i=0;i<visibleCars;i++){
+      const logicalIndex = i + (typeof headShift !== 'undefined' ? headShift : 0);
+      const offset = logicalIndex * carDeg;
+      const start = rotation - offset;
+      const end   = start - carDeg;
+
+      const p1 = polar(start);
+      const p2 = polar(end);
+
+      const path = document.createElementNS(NS,"path");
+      path.setAttribute("d",
+        `M ${p1.x} ${p1.y} A ${R} ${R} 0 0 0 ${p2.x} ${p2.y}`
+      );
+      path.setAttribute("fill","none");
+      path.setAttribute("stroke-width", tubeWidth);
+      path.setAttribute("stroke-linecap","butt");
+      path.setAttribute("stroke", baseColors[(logicalIndex + colorShift) % cars]);
+
+      group.appendChild(path);
+    }
+
+    if(stopping && visibleCars === 0){
+      cancelAnimationFrame(animId);
+      animId = null;
+      group.style.display = "none";
+      stopping = false;
+    }
   }
-}
 
-/* ===== WebAudio 共通 ===== */
-const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-const audioCtx = new AudioContextClass();
-
-function playTone(freq, startTime, duration) {
-  const osc = audioCtx.createOscillator();
-  const gain = audioCtx.createGain();
-
-  osc.type = 'sine';
-  osc.frequency.setValueAtTime(freq, startTime);
-
-  gain.gain.setValueAtTime(0.5, startTime);
-  gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
-
-  osc.connect(gain).connect(audioCtx.destination);
-  osc.start(startTime);
-  osc.stop(startTime + duration);
-}
-
-/* ===== UI音 ===== */
-function beep(freq, dur, gain) {
-  const o = audioCtx.createOscillator();
-  const g = audioCtx.createGain();
-  o.connect(g); g.connect(audioCtx.destination);
-  o.frequency.value = freq;
-  g.gain.value = gain;
-  o.start();
-  o.stop(audioCtx.currentTime + dur);
-}
-
-const beepTap = ()=>beep(1800,0.05,0.15);
-
-/* ===== ★ beepArrow：ドアチャイム音（謙さん版） ===== */
-function beepArrow() {
-  if (audioCtx.state === 'suspended') audioCtx.resume();
-
-  const now = audioCtx.currentTime;
-
-  // 「ピン」
-  playTone(1210, now, 0.5);
-
-  // 「ポーン」
-  playTone(965, now + 0.5, 0.8);
-}
-
-/* ===== iOS Audio Unlock ===== */
-let audioUnlocked = false;
-let sndStart, snd30, sndEnd;
-
-function unlockAudio() {
-  if (audioUnlocked) return;
-  sndStart = new Audio("start-0.mp3");
-  snd30    = new Audio("30sec.mp3");
-  sndEnd   = new Audio("end.mp3");
-  audioUnlocked = true;
-}
-
-/* ===== DOM ===== */
-const timer = document.getElementById("timer");
-const arrows = [...document.querySelectorAll(".arrow")];
-const label = document.getElementById("label");
-
-const ranges = [[180,142],[141,108],[107,74],[73,40],[39,0]];
-
-/* ===== 表示更新 ===== */
-function updateTimer() {
-  const m = Math.floor(time/60);
-  const s = time%60;
-  timer.textContent = `${m}:${s.toString().padStart(2,"0")}`;
-  timer.className="";
-  if (time===TOTAL || time>READY) timer.classList.add("timer-lime");
-  else if (time>30) timer.classList.add("timer-gold");
-  else if (time>0) timer.classList.add("timer-red","blink-slow");
-  else timer.classList.add("timer-lime","blink-fast");
-}
-
-function arrowsOff() {
-  arrows.forEach(a=>{
-    a.classList.remove("blink");
-    a.style.visibility="hidden";
-  });
-  label.style.display="flex";
-}
-
-function arrowsOn() {
-  arrows.forEach(a=>{
-    a.classList.remove("blink");
-    a.style.visibility="visible";
-  });
-  label.style.display="none";
-}
-
-function updateArrows() {
-  const idx = ranges.findIndex(r=>time<=r[0] && time>=r[1]);
-  arrows.forEach((a,i)=>{
-    a.classList.remove("blink");
-    a.style.visibility = time < ranges[i][1] ? "hidden":"visible";
-  });
-  if (idx>=0 && time>0) {
-    arrows[idx].classList.add("blink");
-    if (prevIndex>=0 && idx!==prevIndex) beepArrow();
+  function animate(now){
+    draw(now);
+    animId = requestAnimationFrame(animate);
   }
-  prevIndex = idx;
-}
 
-/* ===== メイン操作 ===== */
-timer.onclick = async ()=>{
-  unlockAudio();
-  beepTap();
+  const origStart = window.startTimer;
+  const origReset = window.resetTimer;
+  const origUpdateDisplay = window.updateDisplay;
 
-  if (!running && time===TOTAL) {
-    running=true;
-    await requestWakeLock();
-
-    intervalId=setInterval(()=>{
-      if (time===182) sndStart.play();
-      if (time===31)  snd30.play();
-      if (time===1)   sndEnd.play();
-
-      if (time<=0) {
-        clearInterval(intervalId);
-        running=false;
-        arrowsOff();
-        updateTimer();
-        return;
-      }
-
-      time--;
-      updateTimer();
-      if (shotPace && time<=READY) updateArrows();
-    },1000);
-
-  } else {
-    clearInterval(intervalId);
-    running=false;
-    releaseWakeLock();
-    time=TOTAL;
-    prevIndex=-1;
-    updateTimer();
-    shotPace?arrowsOn():arrowsOff();
+  window.startTimer = function(){
+    trainStartTime = null;
+    stopStartTime = null;
+    stopping = false;
+    group.style.display = "none";
+    if(origStart) origStart.apply(this,arguments);
   }
-};
 
-shotpace.onclick = ()=>{
-  if (running) return;
-  unlockAudio();
-  beepTap();
-  shotPace=!shotPace;
-  shotPace?arrowsOn():arrowsOff();
-};
+  window.updateDisplay = function(){
+    if(origUpdateDisplay) origUpdateDisplay.apply(this,arguments);
 
-updateTimer();
-arrowsOff();
+    // 3:00 出庫開始
+    if(timeLeft === 180 && !trainStartTime){
+      trainStartTime = performance.now();
+      group.style.display = "block";
+      if(!animId) animId = requestAnimationFrame(animate);
+    }
 
-/* ===== Keyboard対応 ===== */
+    // 0:00 入庫開始（即消さない）
+    if(timeLeft === 0 && trainStartTime && !stopping){
+      stopStartTime = performance.now();
+      elapsedAtStop = (stopStartTime - trainStartTime)/1000;
+      stopping = true;
+    }
+  }
+
+  window.resetTimer = function(){
+    cancelAnimationFrame(animId);
+    animId = null;
+    trainStartTime = null;
+    stopStartTime = null;
+    stopping = false;
+    group.style.display = "none";
+    if(origReset) origReset.apply(this,arguments);
+  }
+})();
+
+/* === Keyboard対応 === */
 document.addEventListener('keydown', function(e){
 
-  // Spaceキーのページスクロール防止
-  if(e.code === 'Space'){
-  e.preventDefault();
-  }
+    // Spaceキーのページスクロール防止
+    if(e.code === 'Space'){
+        e.preventDefault();
+    }
 
-  // START / RESET
-  if(e.code === 'Space' || e.code === 'Enter'){
-  timer.click();
-  }
+    // START / RESET
+    if(e.code === 'Space' || e.code === 'Enter'){
+        handleTap();
+    }
 
-  // Shot Pace ON / OFF
-  else if(e.key === 'a' || e.key === 'A'){
-  if(!running){
-  shotpace.click();
-  }
-}
+    // Mic ON/OFF
+    else if(e.key === 'm' || e.key === 'M'){
+        toggleMic({ stopPropagation: ()=>{} });
+    }
+
+    // メトロノーム ON/OFF
+    else if(e.key === '1'){
+        toggleMetro(1);
+    }
+    else if(e.key === '2'){
+        toggleMetro(2);
+    }
+    else if(e.key === '3'){
+        toggleMetro(3);
+    }
+    else if(e.key === '4'){
+        toggleMetro(4);
+    }
+
+    // メトロノーム停止
+    else if(e.key === '0'){
+        clearMetro();
+    }
 });
 
 </script>
-<div class="extra-bottom-spacer"></div>
 </body>
 </html>
