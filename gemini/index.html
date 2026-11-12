@@ -642,13 +642,14 @@
             if (audioCtx.state === 'suspended') {
                 try { await audioCtx.resume(); } catch(e){}
             }
-            if (playVoiceStartChime && !isIOSDevice) playChime();
+            if (playVoiceStartChime) playChime();
             isRunning = true; 
             if (isMicEnabled) {
                 if (playVoiceStartChime && isIOSDevice) {
-                    voiceStartChimePending = true;
+                    setTimeout(() => { try { recognition.stop(); } catch(e) {} }, 1300);
+                } else {
+                    try { recognition.stop(); } catch(e) {}
                 }
-                try { recognition.stop(); } catch(e) { playVoiceStartChimeAfterRecognitionEnds(); }
             } 
             updateMicVisual();
             updateWakeLock(); 
