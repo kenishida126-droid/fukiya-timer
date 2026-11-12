@@ -225,6 +225,7 @@
 
     <script>
         let timeLeft = 185, timerInterval = null, isRunning = false, wakeLock = null, isMicEnabled = false, recognition = null;
+        let voiceStartChimePending = false, voiceStartChimeFallback = null;
         const display = document.getElementById('timer-display'), micButton = document.getElementById('mic-button');
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 
@@ -460,7 +461,7 @@
                 }
             };
             recognition.onstart = () => { updateMicVisual(); updateWakeLock(); };
-            recognition.onend = () => { if (isMicEnabled && !isRunning) recognition.start(); updateMicVisual(); updateWakeLock(); };
+            recognition.onend = () => { playVoiceStartChimeAfterRecognitionEnds(); if (isMicEnabled && !isRunning) recognition.start(); updateMicVisual(); updateWakeLock(); };
             recognition.onerror = () => { if (isMicEnabled) setTimeout(() => recognition.start(), 300); };
         }
 
@@ -514,6 +515,17 @@
             });
         }
         function playChime() { const now = audioCtx.currentTime; const p = (f, s, d) => { const o = audioCtx.createOscillator(); const g = audioCtx.createGain(); o.type = 'triangle'; o.frequency.setValueAtTime(f, s); g.gain.setValueAtTime(0.5, s); g.gain.exponentialRampToValueAtTime(0.01, s + d); o.connect(g); g.connect(audioCtx.destination); o.start(s); o.stop(s + d); }; p(659.25, now, 0.8); p(523.25, now + 0.4, 1.2); }
+        function playVoiceStartChimeAfterRecognitionEnds() {
+            if (!voiceStartChimePending) return;
+            voiceStartChimePending = false;
+            if (voiceStartChimeFallback) { clearTimeout(voiceStartChimeFallback); voiceStartChimeFallback = null; }
+            setTimeout(async () => {
+                try {
+                    if (audioCtx.state !== 'running') await audioCtx.resume();
+                    if (audioCtx.state === 'running') playChime();
+                } catch(e) {}
+            }, 250);
+        }
         
         let clockHelpTimer = null;
         function hideClockHelp() {
@@ -628,10 +640,14 @@
             if (audioCtx.state === 'suspended') {
                 try { await audioCtx.resume(); } catch(e){}
             }
-            if (playVoiceStartChime) playChime();
-
             isRunning = true; 
-            if (isMicEnabled) { try { recognition.stop(); } catch(e){} } 
+            if (isMicEnabled) {
+                if (playVoiceStartChime) {
+                    voiceStartChimePending = true;
+                    voiceStartChimeFallback = setTimeout(playVoiceStartChimeAfterRecognitionEnds, 800);
+                }
+                try { recognition.stop(); } catch(e) { playVoiceStartChimeAfterRecognitionEnds(); }
+            } 
             updateMicVisual();
             updateWakeLock(); 
             timerInterval = setInterval(() => { 
