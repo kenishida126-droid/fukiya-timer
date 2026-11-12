@@ -481,25 +481,7 @@
                     end: new Audio('end.mp3')
                 };
             }
-            [audioFiles.start, audioFiles.halfMin, audioFiles.end].forEach(a=>{
-                // iPhoneでは volume=0 の直後に 1 へ戻すと、
-                // 実際の再生開始時には音が出てしまう場合があるため muted を使う。
-                a.muted = true;
-                const p = a.play();
-                if(p && typeof p.then === 'function'){
-                    p.then(()=>{
-                        a.pause();
-                        a.currentTime = 0;
-                        a.muted = false;
-                    }).catch(()=>{
-                        a.muted = false;
-                    });
-                } else {
-                    a.pause();
-                    a.currentTime = 0;
-                    a.muted = false;
-                }
-            });
+            // 音声ファイルの先行再生は行わない（初回tap時の追加音を防止）。
             audioUnlocked = true;
         }
         function safePlay(a) {
