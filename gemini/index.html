@@ -228,6 +228,7 @@
         let voiceStartChimePending = false;
         const display = document.getElementById('timer-display'), micButton = document.getElementById('mic-button');
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        const isIOSDevice = /iPhone|iPad|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 
         document.addEventListener(
             'touchstart',
@@ -518,7 +519,7 @@
         function playVoiceStartChimeAfterRecognitionEnds() {
             if (!voiceStartChimePending) return;
             voiceStartChimePending = false;
-            setTimeout(() => retryVoiceStartChime(0), 700);
+            setTimeout(() => retryVoiceStartChime(0), 2000);
         }
         async function retryVoiceStartChime(attempt) {
             try {
@@ -641,9 +642,10 @@
             if (audioCtx.state === 'suspended') {
                 try { await audioCtx.resume(); } catch(e){}
             }
+            if (playVoiceStartChime && !isIOSDevice) playChime();
             isRunning = true; 
             if (isMicEnabled) {
-                if (playVoiceStartChime) {
+                if (playVoiceStartChime && isIOSDevice) {
                     voiceStartChimePending = true;
                 }
                 try { recognition.stop(); } catch(e) { playVoiceStartChimeAfterRecognitionEnds(); }
