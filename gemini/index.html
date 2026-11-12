@@ -455,7 +455,7 @@
                 if (!isRunning && (timeLeft === 185 || timeLeft === 0)) {
                     if (/(開始|かいし|カイシ|スタート|すたーと|start|始め|はじめ|ハジメ)/.test(transcript)) {
                         if (timeLeft === 0) resetTimer();
-                        startTimer();
+                        startTimer(true);
                     }
                 }
             };
@@ -620,7 +620,7 @@
             if (isRunning || timeLeft === 0) resetTimer(); else startTimer(); 
         }
 
-        async function startTimer() { 
+        async function startTimer(playVoiceStartChime = false) { 
             if (isRunning) return; 
 
             // ★ 音声起動時も確実にAudio解放
@@ -628,6 +628,7 @@
             if (audioCtx.state === 'suspended') {
                 try { await audioCtx.resume(); } catch(e){}
             }
+            if (playVoiceStartChime) playChime();
 
             isRunning = true; 
             if (isMicEnabled) { try { recognition.stop(); } catch(e){} } 
